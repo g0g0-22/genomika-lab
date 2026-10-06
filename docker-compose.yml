@@ -1,0 +1,28 @@
+# GenomikaLab — a single service. The Express process serves the JSON API and
+# the built React client from the same port, so there is nothing to put in
+# front of it.
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DB_PATH: /data/genomika.db
+      UPLOAD_DIR: /data/uploads
+      # Supplied as a stack environment value in RepoRun. The default below
+      # only keeps local `docker compose up` working.
+      JWT_SECRET: ${JWT_SECRET:-genomika-lab-dev-secret-change-me}
+      # Set to "false" to deploy with an empty database instead of demo content.
+      AUTO_SEED: ${AUTO_SEED:-true}
+    volumes:
+      - genomika-data:/data
+    expose:
+      - "4000"
+
+volumes:
+  # Survives `docker compose down`, so bookings, applications and messages
+  # submitted during review are still there after a redeploy.
+  genomika-data:

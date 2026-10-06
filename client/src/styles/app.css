@@ -1,0 +1,276 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================================================ PALETTE ===
+   Two committed modes. "Paper" is a warm lab notebook; "Instrument" is a
+   near-black readout with phosphor green. Nothing in between.            */
+
+:root {
+  --bg:        #EFEDE4;
+  --bg-2:      #FAF8F1;
+  --bg-3:      #E5E2D6;
+  --line:      #D4CFBE;
+  --line-soft: #E2DED0;
+  --ink:       #141917;
+  --ink-2:     #3A4441;
+  --muted:     #6B746E;
+  --accent:    #4C7A10;
+  --accent-2:  #9EE64B;
+  --s-green:   #4C8420;
+  --s-blue:    #2E6FBF;
+  --s-amber:   #9A6110;
+  --danger:    #A32717;
+  --grid:      rgba(20, 25, 23, 0.055);
+  --glow:      rgba(76, 122, 16, 0.10);
+  --shadow:    0 1px 0 rgba(20,25,23,.04), 0 12px 32px -18px rgba(20,25,23,.35);
+}
+
+.dark {
+  --bg:        #0A0D0C;
+  --bg-2:      #101514;
+  --bg-3:      #161D1B;
+  --line:      #212C29;
+  --line-soft: #1A2321;
+  --ink:       #E8EFEA;
+  --ink-2:     #C2CFC8;
+  --muted:     #82918B;
+  --accent:    #9EE64B;
+  --accent-2:  #9EE64B;
+  --s-green:   #63A62B;
+  --s-blue:    #4B8FE0;
+  --s-amber:   #BE7A18;
+  --danger:    #FF7A6B;
+  --grid:      rgba(158, 230, 75, 0.045);
+  --glow:      rgba(158, 230, 75, 0.13);
+  --shadow:    0 1px 0 rgba(255,255,255,.02), 0 18px 44px -22px rgba(0,0,0,.9);
+}
+
+@theme inline {
+  --font-display: "Bitter", "Iowan Old Style", Georgia, serif;
+  --font-sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-bg: var(--bg);
+  --color-bg2: var(--bg-2);
+  --color-bg3: var(--bg-3);
+  --color-line: var(--line);
+  --color-linesoft: var(--line-soft);
+  --color-ink: var(--ink);
+  --color-ink2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-sgreen: var(--s-green);
+  --color-sblue: var(--s-blue);
+  --color-samber: var(--s-amber);
+  --color-danger: var(--danger);
+
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 5px;
+}
+
+/* ============================================================== BASE === */
+
+* { border-color: var(--line); }
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "kern", "liga";
+}
+
+/* Graph-paper ground: the lab notebook under everything. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 120% 80% at 50% 0%, #000 30%, transparent 78%);
+}
+
+/* Fine grain so large flat areas are never quite flat. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: .22;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+}
+
+#root { position: relative; z-index: 1; }
+
+::selection { background: var(--accent); color: var(--bg); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.012em; }
+
+/* ========================================================= COMPONENTS === */
+
+@layer components {
+  .rule { border-top: 1px solid var(--line); }
+
+  .card {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+  }
+
+  .card-hover {
+    transition: border-color .22s ease, transform .22s ease, box-shadow .22s ease;
+  }
+  .card-hover:hover {
+    border-color: color-mix(in oklab, var(--accent) 55%, var(--line));
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+
+  /* Instrument label: the small uppercase mono caption used everywhere. */
+  .label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .17em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  .btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: .6rem 1.05rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-xs);
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background .18s ease, color .18s ease, border-color .18s ease;
+    display: inline-flex; align-items: center; gap: .5rem;
+    white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .btn:disabled { opacity: .42; cursor: not-allowed; }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--accent) 84%, var(--ink));
+    border-color: color-mix(in oklab, var(--accent) 84%, var(--ink));
+    color: var(--bg);
+  }
+
+  .btn-sm { padding: .38rem .7rem; font-size: 10px; }
+
+  .input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-xs);
+    padding: .62rem .78rem;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: .875rem;
+    transition: border-color .18s ease, box-shadow .18s ease;
+  }
+  .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
+  .input::placeholder { color: var(--muted); opacity: .8; }
+  textarea.input { line-height: 1.55; resize: vertical; }
+  select.input { cursor: pointer; }
+
+  .chip {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    padding: .22rem .5rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-xs);
+    color: var(--muted);
+    display: inline-block;
+  }
+  .chip-on { border-color: var(--accent); color: var(--accent); background: var(--glow); }
+
+  .link-underline {
+    background-image: linear-gradient(var(--accent), var(--accent));
+    background-size: 0% 1px;
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    transition: background-size .3s cubic-bezier(.2,.8,.3,1);
+  }
+  .link-underline:hover { background-size: 100% 1px; }
+
+  .prose-lab p { line-height: 1.72; color: var(--ink-2); }
+  .prose-lab p + p { margin-top: .9rem; }
+}
+
+/* ============================================================ MOTION === */
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes drawline { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1) }
+  50%      { opacity: .35; transform: scale(.82) }
+}
+@keyframes migrate { from { transform: translateY(-100%); opacity: 0 } to { transform: none; opacity: 1 } }
+
+.rise { animation: rise .62s cubic-bezier(.16,.84,.32,1) both; }
+.fade { animation: fade .8s ease both; }
+.drawline { transform-origin: left; animation: drawline .8s cubic-bezier(.16,.84,.32,1) both; }
+.live-dot { animation: pulse-dot 2.2s ease-in-out infinite; }
+
+/* Sequence rendering ---------------------------------------------------- */
+.seq {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.75;
+  letter-spacing: .06em;
+  word-break: break-all;
+}
+.nt-A { color: #35C77A } .nt-C { color: #4C9BF5 }
+.nt-G { color: #E0A02F } .nt-T, .nt-U { color: #E8605D }
+.nt-N, .nt-x { color: var(--muted) }
+
+/* Thin, always-visible scrollbars inside data panes */
+.scroll-thin { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.scroll-thin::-webkit-scrollbar { height: 8px; width: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+.scroll-thin::-webkit-scrollbar-track { background: transparent; }
+
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  background: var(--accent); color: var(--bg); padding: .6rem 1rem;
+  font-family: var(--font-mono); font-size: 12px;
+}
+.skip-link:focus { left: 0; }

@@ -1,0 +1,10 @@
+version: 1
+ingress:
+  - name: app
+    service: web
+    port: 4000
+    primary: true
+    access:
+      # Reviewers sign in with their university account before reaching the
+      # site. Change to "public" to drop the login requirement.
+      type: cas
