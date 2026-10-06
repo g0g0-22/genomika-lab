@@ -1,8 +1,8 @@
 version: 1
 ingress:
   - name: app
-    service: web
-    port: 4000
+    service: web      # the nginx web tier; the api service stays internal
+    port: 80
     primary: true
     access:
       # Reviewers sign in with their university account before reaching the

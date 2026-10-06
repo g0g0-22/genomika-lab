@@ -60,7 +60,12 @@ app.use('/api', booking);
 app.use('/api', careers);
 app.use('/api/admin', admin);
 
-/* Serve the built client when it exists, so one process serves the whole site. */
+/*
+ * Local convenience only. In Docker the nginx web tier serves the client and
+ * this directory does not exist inside the api image, so the block is skipped.
+ * It keeps `npm start` serving the whole site from one process for anyone
+ * running the project without containers.
+ */
 const clientDist = join(__dirname, '..', '..', 'client', 'dist');
 if (existsSync(clientDist)) {
   app.use(express.static(clientDist));

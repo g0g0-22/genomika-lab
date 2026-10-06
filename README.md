@@ -207,32 +207,60 @@ The repository contains the two files RepoRun requires, at the root:
 version: 1
 ingress:
   - name: app
-    service: web
-    port: 4000
+    service: web      # the nginx web tier; the api service stays internal
+    port: 80
     primary: true
     access:
       type: cas
 ```
 
-Еден сервис. Express процесот го служи и API-то и изградениот клиент од иста
-порта, па нема што да се става пред него.
+Два слоја / Two tiers:
 
-A single service. The Express process serves both the API and the built client
-from the same port, so there is nothing to put in front of it.
+```
+                 ┌──────────────────────────────┐
+  RepoRun  ─────▶│  web   nginx:80              │
+  ingress        │  статички фајлови, gzip,     │
+                 │  кеширање, SPA fallback      │
+                 └───────────────┬──────────────┘
+                                 │  /api  (внатрешна мрежа)
+                 ┌───────────────▼──────────────┐
+                 │  api   node:4000             │
+                 │  Express + SQLite            │
+                 │  volume: genomika-data       │
+                 └──────────────────────────────┘
+```
 
-Крајната точка е зад CAS: прегледувачите се најавуваат со универзитетска сметка
-за да стигнат до сајтот. Најавата во самиот сајт (за резервации и за
-администрација) е одделна и користи ги демо сметките подолу.
+`web` го служи изградениот клиент и го проследува `/api` до `api`. Сервисот
+`api` нема сопствен ingress — достапен е само преку внатрешната мрежа, што
+значи дека базата и прикачените датотеки никогаш не се изложени директно.
 
-The endpoint sits behind CAS: reviewers sign in with a university account to
-reach the site at all. The sign-in inside the site itself — for bookings and
-administration — is separate and uses the demo accounts listed above.
+`web` serves the built client and forwards `/api` to `api`. The `api` service
+has no ingress of its own — it is reachable only over the internal network, so
+the database and uploaded files are never exposed directly.
+
+Поделбата не е козметичка. nginx ги компресира статичките фајлови и им дава
+траен кеш, што Express не го правеше:
+
+The split is not cosmetic. nginx compresses static assets and gives them a
+durable cache, which Express was not doing:
+
+| | Express (едно ниво) | nginx (два слоја) |
+|---|---|---|
+| Пренесени бајти / Bytes on the wire | 356 680 | **108 077** (gzip, 3,3× помалку) |
+| `/assets/*` кеш / cache | `max-age=0` | `max-age=31536000, immutable` |
+| `index.html` | `max-age=0` | `no-cache, must-revalidate` |
+
+Серверот сè уште може да го служи целиот сајт сам кога се вклучува без
+контејнери (`npm start`) — тој код останува за локална работа.
+
+The server can still serve the whole site by itself when run without
+containers (`npm start`) — that code remains, for local work.
 
 ### Чекори / Steps
 
 1. Push-ни го репозиторумот и внеси ја URL-адресата и гранката на страницата на стекот.
 2. Додај ја променливата `JWT_SECRET` како environment value на стекот — произволна долга низа.
-3. Притисни **Validate**, потоа **Deploy**. Првиот build трае неколку минути (се компајлира `better-sqlite3`).
+3. Притисни **Validate**, потоа **Deploy**. Првиот build трае неколку минути (се компајлира `better-sqlite3`); двата image-а се градат паралелно.
 
 ### Што се случува при првиот деплој / What the first deploy does
 
@@ -271,10 +299,12 @@ docker compose up -d --build
 ```
 
 Compose-датотеката користи `expose` наместо `ports`, бидејќи RepoRun се грижи
-за ingress. За локален пристап додај `ports: ["4000:4000"]` на сервисот `web`.
+за ingress. За локален пристап додај `ports: ["8080:80"]` на сервисот `web`,
+па отвори `http://localhost:8080`.
 
 The compose file uses `expose` rather than `ports`, because RepoRun handles
-ingress. For local access add `ports: ["4000:4000"]` to the `web` service.
+ingress. For local access add `ports: ["8080:80"]` to the `web` service and
+open `http://localhost:8080`.
 
 ---
 

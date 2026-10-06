@@ -1,10 +1,27 @@
-# GenomikaLab — a single service. The Express process serves the JSON API and
-# the built React client from the same port, so there is nothing to put in
-# front of it.
+# GenomikaLab — two tiers.
+#
+#   web : nginx. Serves the built React application, compresses it, sets cache
+#         policy, and forwards /api to the application tier.
+#   api : node. Application logic and the SQLite database. Never exposed
+#         directly; only reachable from web over the internal network.
+#
+# RepoRun exposes `web` (see stack.yml); `api` has no ingress of its own.
+
 services:
   web:
     build:
-      context: .
+      context: ./client
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    expose:
+      - "80"
+
+  api:
+    build:
+      context: ./server
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
@@ -13,7 +30,7 @@ services:
       DB_PATH: /data/genomika.db
       UPLOAD_DIR: /data/uploads
       # Supplied as a stack environment value in RepoRun. The default below
-      # only keeps local `docker compose up` working.
+      # only keeps a local `docker compose up` working.
       JWT_SECRET: ${JWT_SECRET:-genomika-lab-dev-secret-change-me}
       # Set to "false" to deploy with an empty database instead of demo content.
       AUTO_SEED: ${AUTO_SEED:-true}
