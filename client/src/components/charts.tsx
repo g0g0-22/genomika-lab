@@ -9,7 +9,7 @@ import { useId, useRef, useState, type ReactNode } from 'react';
  * currently visible.
  */
 
-export const SERIES = ['var(--s-green)', 'var(--s-blue)', 'var(--s-amber)'];
+export const SERIES = ['var(--s-green)', 'var(--s-blue)', 'var(--s-rose)'];
 
 type Point = { label: string; value: number; color?: string; meta?: string };
 
@@ -37,19 +37,6 @@ function useTooltip() {
     </div>
   ) : null;
   return { ref, show, hide: () => setTip(null), node };
-}
-
-export function Legend({ items }: { items: { label: string; color: string }[] }) {
-  return (
-    <ul className="flex flex-wrap gap-x-5 gap-y-2 mt-4">
-      {items.map(item => (
-        <li key={item.label} className="flex items-center gap-2 text-[11px] text-ink2">
-          <span className="w-2.5 h-2.5 rounded-[2px] shrink-0" style={{ background: item.color }} aria-hidden="true" />
-          {item.label}
-        </li>
-      ))}
-    </ul>
-  );
 }
 
 /* ----------------------------------------------------------- BAR CHART -- */
@@ -314,24 +301,5 @@ export function Gantt({ rows, formatDate }: { rows: GanttRow[]; formatDate: (iso
       </ul>
       {node}
     </div>
-  );
-}
-
-/* ------------------------------------------------------------ SPARKLINE -- */
-
-export function Sparkline({ values, width = 90, height = 24, color = 'var(--accent)' }: {
-  values: number[]; width?: number; height?: number; color?: string;
-}) {
-  if (values.length < 2) return null;
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values, 0);
-  const span = max - min || 1;
-  const d = values
-    .map((v, i) => `${i === 0 ? 'M' : 'L'}${(i / (values.length - 1)) * width},${height - ((v - min) / span) * height}`)
-    .join(' ');
-  return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true" className="overflow-visible">
-      <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }

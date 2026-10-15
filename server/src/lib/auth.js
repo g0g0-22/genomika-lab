@@ -2,12 +2,17 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { db } from '../db.js';
 
-const DEV_SECRET = 'genomika-lab-dev-secret-change-me';
-export const JWT_SECRET = process.env.JWT_SECRET || DEV_SECRET;
-
-if (JWT_SECRET === DEV_SECRET && process.env.NODE_ENV === 'production') {
-  console.warn('WARNING: JWT_SECRET is unset — tokens are signed with the public development secret.');
+/*
+ * There is deliberately no usable default. A signing secret that ships in the
+ * repository is not a secret: anyone holding the source could mint an admin
+ * token. Outside development the process refuses to start without one.
+ */
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.error('FATAL: JWT_SECRET is not set. Refusing to start with an unsigned-equivalent secret.');
+  process.exit(1);
 }
+export const JWT_SECRET = process.env.JWT_SECRET
+  || 'local-development-only-do-not-deploy';
 const TOKEN_TTL = '8h';
 
 export function authenticate(email, password) {

@@ -177,7 +177,7 @@ export default function Facilities() {
                   ))}
                 </dl>
                 {instrument.requires_training === 1 && (
-                  <p className="label mt-4 text-samber">⚠ {t('fac.training')}</p>
+                  <p className="label mt-4 text-srose">⚠ {t('fac.training')}</p>
                 )}
               </Card>
 
@@ -208,7 +208,9 @@ export default function Facilities() {
                         onClick={() => slot.free && pick(slot.hour)}
                         disabled={!slot.free || instrument.status !== 'available'}
                         aria-pressed={selected}
-                        title={slot.booking ? `${slot.booking.user_name} — ${slot.booking.purpose ?? ''}` : t('fac.freeslot')}
+                        title={slot.booking
+                          ? `${slot.booking.user_name} — ${slot.booking.purpose ?? ''}`
+                          : slot.free ? t('fac.freeslot') : t('fac.taken')}
                         className={`px-2 py-3 rounded-xs border text-center transition-colors ${
                           selected
                             ? 'border-accent bg-accent text-bg'

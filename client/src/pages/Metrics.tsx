@@ -108,7 +108,7 @@ export default function Metrics() {
               color: project.status === 'completed'
                 ? 'var(--muted)'
                 : project.status === 'planned'
-                  ? 'var(--s-amber)'
+                  ? 'var(--s-rose)'
                   : 'var(--s-green)'
             }))}
           />

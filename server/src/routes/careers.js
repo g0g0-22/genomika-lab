@@ -12,6 +12,16 @@ const MAX_CV_BYTES = 4 * 1024 * 1024;
 const ALLOWED_CV = ['application/pdf', 'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
 
+/** Leading bytes of the formats we accept — a declared MIME type proves nothing. */
+const CV_SIGNATURES = [
+  [0x25, 0x50, 0x44, 0x46],                         // %PDF
+  [0x50, 0x4B, 0x03, 0x04],                         // PK.. — DOCX (a zip)
+  [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]  // legacy .doc
+];
+
+const looksLikeAllowedDocument = (buffer) =>
+  CV_SIGNATURES.some(sig => sig.every((byte, i) => buffer[i] === byte));
+
 careers.get('/positions', (req, res) => {
   const open = req.query.open;
   let sql = `SELECT p.*, g.slug AS group_slug, g.name_mk AS group_name_mk, g.name_en AS group_name_en, g.accent
@@ -41,22 +51,43 @@ careers.post('/positions/:slug/apply', (req, res) => {
   if (motivation.length < 40) errors.motivation = 'too_short';
   if (motivation.length > 4000) errors.motivation = 'too_long';
 
+  /*
+   * Nothing reaches the disk until every check has passed. Writing first and
+   * validating afterwards let an unauthenticated caller leave orphaned files
+   * on the volume by failing a different field on purpose.
+   *
+   * The declared MIME type is attacker-supplied, so it is checked
+   * unconditionally AND corroborated against the file's leading bytes.
+   */
   const cv = req.body?.cv;
-  let cvFilename = null, cvSize = null;
+  let cvFilename = null, cvSize = null, cvBuffer = null;
+
   if (cv?.data) {
-    const buffer = Buffer.from(String(cv.data).split(',').pop(), 'base64');
-    if (buffer.length > MAX_CV_BYTES) errors.cv = 'too_large';
-    else if (cv.type && !ALLOWED_CV.includes(cv.type)) errors.cv = 'unsupported_type';
+    let buffer;
+    try {
+      buffer = Buffer.from(String(cv.data).split(',').pop(), 'base64');
+    } catch {
+      buffer = Buffer.alloc(0);
+    }
+
+    if (buffer.length === 0) errors.cv = 'unreadable';
+    else if (buffer.length > MAX_CV_BYTES) errors.cv = 'too_large';
+    else if (!ALLOWED_CV.includes(String(cv.type || ''))) errors.cv = 'unsupported_type';
+    else if (!looksLikeAllowedDocument(buffer)) errors.cv = 'unsupported_type';
     else {
       const safe = String(cv.name || 'cv.pdf').replace(/[^\w.\-]+/g, '_').slice(-80);
       cvFilename = `${Date.now()}-${safe}`;
       cvSize = buffer.length;
-      mkdirSync(UPLOAD_DIR, { recursive: true });
-      writeFileSync(join(UPLOAD_DIR, cvFilename), buffer);
+      cvBuffer = buffer;
     }
   }
 
   if (Object.keys(errors).length) return res.status(400).json({ error: 'validation_failed', fields: errors });
+
+  if (cvBuffer) {
+    mkdirSync(UPLOAD_DIR, { recursive: true });
+    writeFileSync(join(UPLOAD_DIR, cvFilename), cvBuffer);
+  }
 
   const info = db.prepare(
     'INSERT INTO applications (position_id,name,email,motivation,cv_filename,cv_size) VALUES (?,?,?,?,?,?)'

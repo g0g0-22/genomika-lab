@@ -81,7 +81,7 @@ export default function Gel() {
   }, [sites, seq.length]);
 
   return (
-    <ToolShell index="05.3 / GEL" name="tool.gel.name" desc="tool.gel.desc">
+    <ToolShell index="05.2 / GEL" name="tool.gel.name" desc="tool.gel.desc">
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] items-start">
         {/* ------------------------------------------------------ controls */}
         <aside className="space-y-6 lg:sticky lg:top-28">

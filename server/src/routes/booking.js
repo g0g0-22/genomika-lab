@@ -31,26 +31,23 @@ booking.get('/instruments/:slug/availability', (req, res) => {
     "SELECT id, user_name, start_hour, end_hour, purpose, status FROM bookings WHERE instrument_id = ? AND date = ? AND status != 'cancelled'"
   ).all(instrument.id, date);
 
+  /*
+   * Whether an hour is free is public information — you need it to book.
+   * Who booked it, and what for, is not: that would tell any visitor which
+   * researcher is running which experiment and when. Identity is attached
+   * only for signed-in callers.
+   */
+  const signedIn = Boolean(req.user);
   const slots = [];
   for (let h = instrument.open_from; h < instrument.open_to; h++) {
     const taken = rows.find(b => h >= b.start_hour && h < b.end_hour);
-    slots.push({ hour: h, free: !taken, booking: taken ? { id: taken.id, user_name: taken.user_name, purpose: taken.purpose } : null });
+    slots.push({
+      hour: h,
+      free: !taken,
+      booking: taken && signedIn ? { id: taken.id, user_name: taken.user_name, purpose: taken.purpose } : null
+    });
   }
-  res.json({ instrument, date, slots, bookings: rows });
-});
-
-/** Week-at-a-glance across every instrument. */
-booking.get('/bookings/week', (req, res) => {
-  const from = String(req.query.from || '');
-  if (!DATE_RE.test(from)) return res.status(400).json({ error: 'invalid_date' });
-  const start = new Date(`${from}T00:00:00`);
-  const end = new Date(start); end.setDate(end.getDate() + 7);
-  const iso = (d) => d.toISOString().slice(0, 10);
-  res.json(db.prepare(
-    `SELECT b.*, i.slug AS instrument_slug, i.name_mk AS instrument_mk, i.name_en AS instrument_en, i.category
-     FROM bookings b JOIN instruments i ON i.id = b.instrument_id
-     WHERE b.date >= ? AND b.date < ? AND b.status != 'cancelled' ORDER BY b.date, b.start_hour`
-  ).all(from, iso(end)));
+  res.json({ instrument, date, slots, bookings: signedIn ? rows : [] });
 });
 
 booking.get('/bookings/mine', requireAuth, (req, res) => {

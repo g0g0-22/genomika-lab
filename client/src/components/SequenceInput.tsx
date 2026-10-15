@@ -58,7 +58,7 @@ export function SequenceInput({ value, onChange, onExample, label, placeholder, 
         spellCheck={false}
       />
       {dropped ? (
-        <p className="mt-1.5 text-[11px] text-samber">{t('seq.invalid')} ({dropped})</p>
+        <p className="mt-1.5 text-[11px] text-srose">{t('seq.invalid')} ({dropped})</p>
       ) : null}
     </div>
   );

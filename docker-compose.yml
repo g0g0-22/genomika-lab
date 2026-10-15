@@ -29,9 +29,9 @@ services:
       PORT: 4000
       DB_PATH: /data/genomika.db
       UPLOAD_DIR: /data/uploads
-      # Supplied as a stack environment value in RepoRun. The default below
-      # only keeps a local `docker compose up` working.
-      JWT_SECRET: ${JWT_SECRET:-genomika-lab-dev-secret-change-me}
+      # Required. Compose refuses to start the stack if it is unset, rather
+      # than substituting a value that is public in this repository.
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in a .env file or the environment}
       # Set to "false" to deploy with an empty database instead of demo content.
       AUTO_SEED: ${AUTO_SEED:-true}
     volumes:

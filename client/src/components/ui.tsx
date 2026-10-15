@@ -216,9 +216,15 @@ export function Crumb({ to, label }: { to: string; label: string }) {
 
 /* ---------------------------------------------------------------- UTILS */
 
-/** Maps a group's accent key onto its validated categorical series colour. */
+/**
+ * Maps a group's accent key onto its categorical series colour. 'amber' is the
+ * key stored by older seeds; the colour it names is now a rose, chosen because
+ * green and amber were indistinguishable under simulated protanopia.
+ */
 export const accentVar = (accent?: string) =>
-  accent === 'blue' ? 'var(--s-blue)' : accent === 'amber' ? 'var(--s-amber)' : 'var(--s-green)';
+  accent === 'blue' ? 'var(--s-blue)'
+    : accent === 'amber' || accent === 'rose' ? 'var(--s-rose)'
+    : 'var(--s-green)';
 
 export function CopyButton({ text, label }: { text: string; label?: string }) {
   const { t } = useLang();

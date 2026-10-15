@@ -1,7 +1,7 @@
 import { formatBlocks, AA_CLASS } from '../lib/bio/sequence';
 
 const AA_COLOR: Record<string, string> = {
-  hydrophobic: 'var(--s-amber)',
+  hydrophobic: 'var(--s-rose)',
   polar: 'var(--s-green)',
   acidic: 'var(--danger)',
   basic: 'var(--s-blue)',
@@ -53,56 +53,6 @@ export function SeqView({ seq, kind = 'nucleotide', lineLength = 60, maxHeight =
           </span>
         </div>
       ))}
-    </div>
-  );
-}
-
-/** Pairwise alignment display: two sequences with a match midline between them. */
-export function AlignmentView({ a, b, midline, labelA, labelB, chunk = 60 }: {
-  a: string; b: string; midline: string; labelA: string; labelB: string; chunk?: number;
-}) {
-  const rows: number[] = [];
-  for (let i = 0; i < a.length; i += chunk) rows.push(i);
-  const labelWidth = Math.max(labelA.length, labelB.length, 3);
-
-  const countReal = (s: string, upTo: number) => {
-    let n = 0;
-    for (let i = 0; i < upTo; i++) if (s[i] !== '-') n++;
-    return n;
-  };
-
-  return (
-    <div className="seq scroll-thin overflow-auto card p-3.5">
-      {rows.map(offset => {
-        const sliceA = a.slice(offset, offset + chunk);
-        const sliceB = b.slice(offset, offset + chunk);
-        const sliceMid = midline.slice(offset, offset + chunk);
-        const startA = countReal(a, offset) + 1;
-        const startB = countReal(b, offset) + 1;
-        return (
-          <div key={offset} className="mb-4 last:mb-0 whitespace-pre">
-            <div className="flex gap-3">
-              <span className="text-muted shrink-0" style={{ minWidth: `${labelWidth}ch` }}>{labelA.padEnd(labelWidth)}</span>
-              <span className="text-muted opacity-60 shrink-0 w-12 text-right">{startA}</span>
-              <span>{sliceA.split('').map((ch, i) => (
-                <span key={i} className={ch === '-' ? 'text-muted' : `nt-${ch}`}>{ch}</span>
-              ))}</span>
-            </div>
-            <div className="flex gap-3">
-              <span className="shrink-0" style={{ minWidth: `${labelWidth}ch` }} />
-              <span className="shrink-0 w-12" />
-              <span className="text-accent">{sliceMid}</span>
-            </div>
-            <div className="flex gap-3">
-              <span className="text-muted shrink-0" style={{ minWidth: `${labelWidth}ch` }}>{labelB.padEnd(labelWidth)}</span>
-              <span className="text-muted opacity-60 shrink-0 w-12 text-right">{startB}</span>
-              <span>{sliceB.split('').map((ch, i) => (
-                <span key={i} className={ch === '-' ? 'text-muted' : `nt-${ch}`}>{ch}</span>
-              ))}</span>
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 }

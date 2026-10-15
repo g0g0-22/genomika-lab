@@ -2,6 +2,14 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ============================================================= PALETTE ===
+   Text and border values are chosen against measured WCAG ratios, not by eye:
+   --muted 4.64:1 and --accent 4.63:1 on paper (AA for normal text), and
+   --line-firm 3.04:1 (AA for non-text UI boundaries) in both themes.
+
+   The third categorical series is a rose rather than an amber. Green and
+   amber are both long-wavelength and collapsed to ΔE 9.3 under simulated
+   protanopia; the rose separates at ΔE 31 across normal, deutan, protan and
+   tritan vision, checked over every pair rather than adjacent ones.
    A laboratory record, not a product page. Paper white, hairline rules, one
    muted sage. Colour appears in the data and in the helix — never as chrome. */
 
@@ -11,17 +19,17 @@
   --ground-2:   #EBEBE6;
   --line:       #E4E4DE;
   --line-soft:  #EFEFEA;
-  --line-firm:  #C9C9C1;
+  --line-firm:  #959585;
   --ink:        #141413;
   --ink-2:      #4D4D49;
-  --muted:      #8C8C85;
-  --accent:     #5F7F67;
+  --muted:      #75756E;
+  --accent:     #5D7C65;
   --accent-soft:#DDE7DD;
   --solid:      #171716;   /* dark pill fill  */
   --on-solid:   #FAFAF8;
   --s-green:    #4C8420;
   --s-blue:     #2E6FBF;
-  --s-amber:    #9A6110;
+  --s-rose:     #A8325A;
   --danger:     #A3372A;
 }
 
@@ -31,7 +39,7 @@
   --ground-2:   #1F1F1E;
   --line:       #2A2A28;
   --line-soft:  #212120;
-  --line-firm:  #3A3A37;
+  --line-firm:  #61615C;
   --ink:        #F3F3F0;
   --ink-2:      #C3C3BD;
   --muted:      #8B8B84;
@@ -41,7 +49,7 @@
   --on-solid:   #141413;
   --s-green:    #63A62B;
   --s-blue:     #4B8FE0;
-  --s-amber:    #BE7A18;
+  --s-rose:     #D8577E;
   --danger:     #E2796A;
 }
 
@@ -63,7 +71,7 @@
   --color-solid:     var(--solid);
   --color-sgreen:    var(--s-green);
   --color-sblue:     var(--s-blue);
-  --color-samber:    var(--s-amber);
+  --color-srose:     var(--s-rose);
   --color-danger:    var(--danger);
 
   --radius-xs: 0px;
