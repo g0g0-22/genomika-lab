@@ -66,9 +66,20 @@ npm run dev:client    # Vite на :5173, со proxy кон :4000
 npm test
 ```
 
-14 теста ја покриваат целата алгоритамска библиотека — парсирање FASTA, транслација, наоѓање отворени рамки на читање и рестрикциска дигестија — со очекувани вредности проверливи наспрема која било референтна имплементација.
+**43 теста** во две нивоа:
 
-14 tests cover the whole algorithm library — FASTA parsing, translation, open-reading-frame detection and restriction digestion — with expected values checkable against any reference implementation.
+* **14** ја покриваат алгоритамската библиотека — парсирање FASTA, транслација, наоѓање отворени рамки на читање и рестрикциска дигестија — со очекувани вредности проверливи наспрема која било референтна имплементација.
+* **29** го возат вистинскиот HTTP слој врз привремена база: автентикација, авторизација, преклопување резервации, валидација на прикачени датотеки, приватност на податоците и пребарување. Ништо не е мокирано.
+
+```bash
+npm run test:client     # алгоритми
+npm run test:server     # API
+```
+
+**43 tests** at two levels:
+
+* **14** cover the algorithm library — FASTA parsing, translation, open-reading-frame detection and restriction digestion — with expected values checkable against any reference implementation.
+* **29** drive the real HTTP layer against a throwaway database: authentication, authorisation, booking overlap, upload validation, data privacy and search. Nothing is mocked.
 
 ---
 
@@ -114,6 +125,8 @@ Results are checkable against reference implementations:
 genomika-lab/
 ├── server/                  Express + SQLite (better-sqlite3), ESM
 │   └── src/
+│       ├── tests/api.test.js  29 интеграциски теста врз вистинскиот HTTP слој
+│       ├── app.js           Склопување на апликацијата (без слушање порта)
 │       ├── db.js            Шема на базата — 17 табели
 │       ├── seed.js          Двојазични демо податоци
 │       ├── index.js         Влезна точка; служи и client/dist

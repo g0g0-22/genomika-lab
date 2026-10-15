@@ -36,11 +36,18 @@ admin.get('/overview', (_req, res) => {
 /* ------------------------------------------------------ PUBLICATIONS CRUD */
 const PUB_FIELDS = ['title','authors','venue','year','type','doi','citations','open_access','abstract','group_id','keywords'];
 
+/*
+ * Columns that are NOT NULL with a default. Passing an explicit null defeats
+ * the default and raises a constraint error, so an omitted field has to fall
+ * back to the same value the schema would have used.
+ */
+const PUB_DEFAULTS = { type: 'article', citations: 0, open_access: 1, year: new Date().getFullYear() };
+
 admin.post('/publications', (req, res) => {
   const b = req.body || {};
   if (!String(b.title || '').trim()) return res.status(400).json({ error: 'title_required' });
   if (!String(b.authors || '').trim()) return res.status(400).json({ error: 'authors_required' });
-  const values = PUB_FIELDS.map(f => b[f] ?? (['citations','open_access'].includes(f) ? 0 : null));
+  const values = PUB_FIELDS.map(f => b[f] ?? PUB_DEFAULTS[f] ?? null);
   const info = db.prepare(
     `INSERT INTO publications (${PUB_FIELDS.join(',')}) VALUES (${PUB_FIELDS.map(() => '?').join(',')})`
   ).run(...values);
