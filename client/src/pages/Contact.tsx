@@ -83,7 +83,7 @@ export default function Contact() {
             <Label>{t('con.address')}</Label>
             <address className="mt-2.5 not-italic text-[13.5px] leading-relaxed text-ink2">
               {lang === 'mk' ? 'ГеномикаЛаб' : 'GenomikaLab'}<br />
-              {lang === 'mk' ? 'ул. Руѓер Бошковиќ 16' : 'Rugjer Boshkovikj 16'}<br />
+              {lang === 'mk' ? 'ул. Руѓер Бошковиќ бр. 16' : 'Rugjer Boshkovikj 16'}<br />
               1000 {lang === 'mk' ? 'Скопје' : 'Skopje'}<br />
               {lang === 'mk' ? 'Северна Македонија' : 'North Macedonia'}
             </address>
