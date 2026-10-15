@@ -1,6 +1,12 @@
 import { Router } from 'express';
+import { existsSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { db } from '../db.js';
 import { requireAdmin } from '../lib/auth.js';
+
+const UPLOAD_DIR = process.env.UPLOAD_DIR
+  || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'uploads');
 
 export const admin = Router();
 admin.use(requireAdmin);
@@ -147,9 +153,29 @@ admin.delete('/people/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+/**
+ * Serves a stored CV to an administrator. The filename comes from the database
+ * rather than the URL, but it is still resolved and checked for containment:
+ * a stored value must never be able to address a file outside the upload
+ * directory, however it got there.
+ */
+admin.get('/applications/:id/cv', (req, res) => {
+  const row = db.prepare('SELECT cv_filename FROM applications WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not_found' });
+  if (!row.cv_filename) return res.status(404).json({ error: 'no_cv_attached' });
+
+  const target = resolve(UPLOAD_DIR, row.cv_filename);
+  if (!target.startsWith(resolve(UPLOAD_DIR) + '/')) return res.status(400).json({ error: 'invalid_path' });
+  if (!existsSync(target)) return res.status(410).json({ error: 'file_missing' });
+
+  res.download(target, row.cv_filename);
+});
+
 /* ---------------------------------------------------------- INBOX ACTIONS */
 admin.put('/messages/:id/handled', (req, res) => {
-  db.prepare('UPDATE messages SET handled = ? WHERE id = ?').run(req.body?.handled ? 1 : 0, req.params.id);
+  const info = db.prepare('UPDATE messages SET handled = ? WHERE id = ?')
+    .run(req.body?.handled ? 1 : 0, req.params.id);
+  if (!info.changes) return res.status(404).json({ error: 'not_found' });
   res.json({ ok: true });
 });
 
@@ -157,6 +183,7 @@ admin.put('/applications/:id/status', (req, res) => {
   const allowed = ['received', 'shortlisted', 'rejected', 'invited'];
   const status = String(req.body?.status || '');
   if (!allowed.includes(status)) return res.status(400).json({ error: 'invalid_status' });
-  db.prepare('UPDATE applications SET status = ? WHERE id = ?').run(status, req.params.id);
+  const info = db.prepare('UPDATE applications SET status = ? WHERE id = ?').run(status, req.params.id);
+  if (!info.changes) return res.status(404).json({ error: 'not_found' });
   res.json({ ok: true });
 });

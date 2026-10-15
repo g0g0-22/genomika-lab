@@ -4,7 +4,8 @@ import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { authenticate, issueToken, publicUser, readToken, requireAuth } from './lib/auth.js';
+import { authenticate, issueToken, publicUser, readToken, requireAuth,
+         throttleKey, tooManyAttempts, recordFailure, clearAttempts } from './lib/auth.js';
 import { content } from './routes/content.js';
 import { events } from './routes/events.js';
 import { booking } from './routes/booking.js';
@@ -36,8 +37,15 @@ export function createApp({ quiet = false } = {}) {
 
   /* ------------------------------------------------------------------ AUTH */
   app.post('/api/auth/login', (req, res) => {
+    const key = throttleKey(req, req.body?.email);
+    if (tooManyAttempts(key)) return res.status(429).json({ error: 'too_many_attempts' });
+
     const user = authenticate(req.body?.email, req.body?.password);
-    if (!user) return res.status(401).json({ error: 'invalid_credentials' });
+    if (!user) {
+      recordFailure(key);
+      return res.status(401).json({ error: 'invalid_credentials' });
+    }
+    clearAttempts(key);
     res.json({ token: issueToken(user), user: publicUser(user) });
   });
 
@@ -65,8 +73,9 @@ export function createApp({ quiet = false } = {}) {
   app.use('/api', (_req, res) => res.status(404).json({ error: 'unknown_endpoint' }));
 
   app.use((err, _req, res, _next) => {
+    // Logged in full server-side; the client is told only that it failed.
     if (!quiet) console.error(err);
-    res.status(500).json({ error: 'internal_error', message: err.message });
+    res.status(500).json({ error: 'internal_error' });
   });
 
   return app;

@@ -23,15 +23,8 @@ const SEED = join(ROOT, 'server/src/seed.js');
 
 /** Macedonian hardcoded in components rather than held in the dictionary. */
 const INLINE = [
-  { file: 'client/src/pages/Contact.tsx',      mk: 'ГеномикаЛаб',            en: 'GenomikaLab' },
-  { file: 'client/src/pages/Contact.tsx',      mk: 'ул. Руѓер Бошковиќ 16',  en: 'Rugjer Boshkovikj 16' },
-  { file: 'client/src/pages/Contact.tsx',      mk: 'Скопје',                 en: 'Skopje' },
-  { file: 'client/src/pages/Contact.tsx',      mk: 'Северна Македонија',     en: 'North Macedonia' },
-  { file: 'client/src/pages/admin/Admin.tsx',  mk: 'Наслов (MK)',            en: 'Title (MK) — admin form label' },
-  { file: 'client/src/pages/admin/Admin.tsx',  mk: 'Извадок (MK)',           en: 'Excerpt (MK) — admin form label' },
-  { file: 'client/src/pages/admin/Admin.tsx',  mk: 'Текст (MK)',             en: 'Body (MK) — admin form label' },
-  { file: 'client/src/pages/admin/Admin.tsx',  mk: 'Име (MK)',               en: 'Name (MK) — admin form label' },
-  { file: 'client/src/pages/admin/Admin.tsx',  mk: 'Улога (MK)',             en: 'Role (MK) — admin form label' }
+  // Kept deliberately small: everything else now lives in the dictionary.
+  // Verified against the source before each release of this script.
 ];
 
 const read = (p) => readFileSync(p, 'utf8');

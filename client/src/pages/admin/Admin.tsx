@@ -190,7 +190,13 @@ export default function Admin() {
                   <p className="label mt-1.5">{f(application, 'position')}</p>
                   <p className="mt-2.5 text-[13px] leading-relaxed text-ink2 line-clamp-3">{application.motivation}</p>
                   {application.cv_filename && (
-                    <p className="label mt-2">CV · {Math.round((application.cv_size ?? 0) / 1024)} KB</p>
+                    <a
+                      className="btn btn-sm mt-3"
+                      href={`/api/admin/applications/${application.id}/cv`}
+                      download
+                    >
+                      ↓ {t('adm.downloadcv')} · {Math.round((application.cv_size ?? 0) / 1024)} KB
+                    </a>
                   )}
                   <div className="flex gap-2 mt-3">
                     {['shortlisted', 'invited', 'rejected'].map(status => (
@@ -387,29 +393,29 @@ function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
         <h2 className="label mb-4">{editing ? t('common.edit') : t('adm.new')}</h2>
         {notice && <div className="mb-4"><Notice kind={notice.kind}>{notice.text}</Notice></div>}
         <div className="space-y-4">
-          <Field label="Наслов (MK)" required>
+          <Field label={`${t('adm.newstitle')} ${t('adm.suffixmk')}`} required>
             <input className="input" lang="mk" value={draft.title_mk} onChange={e => setDraft({ ...draft, title_mk: e.target.value })} />
           </Field>
-          <Field label="Title (EN)" required>
+          <Field label={`${t('adm.newstitle')} ${t('adm.suffixen')}`} required>
             <input className="input" lang="en" value={draft.title_en} onChange={e => setDraft({ ...draft, title_en: e.target.value })} />
           </Field>
-          <Field label={`${t('adm.excerpt')} (MK)`}>
+          <Field label={`${t('adm.excerpt')} ${t('adm.suffixmk')}`}>
             <textarea className="input" rows={2} lang="mk" value={draft.excerpt_mk ?? ''} onChange={e => setDraft({ ...draft, excerpt_mk: e.target.value })} />
           </Field>
-          <Field label={`${t('adm.excerpt')} (EN)`}>
+          <Field label={`${t('adm.excerpt')} ${t('adm.suffixen')}`}>
             <textarea className="input" rows={2} lang="en" value={draft.excerpt_en ?? ''} onChange={e => setDraft({ ...draft, excerpt_en: e.target.value })} />
           </Field>
-          <Field label={`${t('adm.body')} (MK)`}>
+          <Field label={`${t('adm.body')} ${t('adm.suffixmk')}`}>
             <textarea className="input" rows={3} lang="mk" value={draft.body_mk ?? ''} onChange={e => setDraft({ ...draft, body_mk: e.target.value })} />
           </Field>
-          <Field label={`${t('adm.body')} (EN)`}>
+          <Field label={`${t('adm.body')} ${t('adm.suffixen')}`}>
             <textarea className="input" rows={3} lang="en" value={draft.body_en ?? ''} onChange={e => setDraft({ ...draft, body_en: e.target.value })} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('common.date')}>
               <input className="input num" type="date" value={draft.date} onChange={e => setDraft({ ...draft, date: e.target.value })} />
             </Field>
-            <Field label="tag">
+            <Field label={t('adm.tag')}>
               <select className="input" value={draft.tag} onChange={e => setDraft({ ...draft, tag: e.target.value })}>
                 {['news', 'publication', 'grant', 'outreach', 'facility', 'award', 'people'].map(tag => (
                   <option key={tag} value={tag}>{tag}</option>
@@ -478,20 +484,20 @@ function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void 
         <h2 className="label mb-4">{editing ? t('common.edit') : t('adm.new')}</h2>
         {notice && <div className="mb-4"><Notice kind={notice.kind}>{notice.text}</Notice></div>}
         <div className="space-y-4">
-          <Field label="Име (MK)" required>
+          <Field label={`${t('common.name')} ${t('adm.suffixmk')}`} required>
             <input className="input" lang="mk" value={draft.name_mk} onChange={e => setDraft({ ...draft, name_mk: e.target.value })} />
           </Field>
-          <Field label="Name (EN)" required>
+          <Field label={`${t('common.name')} ${t('adm.suffixen')}`} required>
             <input className="input" lang="en" value={draft.name_en} onChange={e => setDraft({ ...draft, name_en: e.target.value })} />
           </Field>
-          <Field label="Улога (MK)">
+          <Field label={`${t('adm.role')} ${t('adm.suffixmk')}`}>
             <input className="input" lang="mk" value={draft.role_mk ?? ''} onChange={e => setDraft({ ...draft, role_mk: e.target.value })} />
           </Field>
-          <Field label={`${t('adm.role')} (EN)`}>
+          <Field label={`${t('adm.role')} ${t('adm.suffixen')}`}>
             <input className="input" lang="en" value={draft.role_en ?? ''} onChange={e => setDraft({ ...draft, role_en: e.target.value })} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="seniority">
+            <Field label={t('adm.seniority')}>
               <select className="input" value={draft.seniority} onChange={e => setDraft({ ...draft, seniority: e.target.value })}>
                 {['faculty', 'postdoc', 'staff', 'phd', 'msc'].map(level => <option key={level} value={level}>{level}</option>)}
               </select>

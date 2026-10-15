@@ -380,6 +380,78 @@ test('an accepted upload is written exactly once', async () => {
   assert.match(files[0], /-cv\.pdf$/);
 });
 
+test('repeated failed logins are throttled, and a success clears the count', async () => {
+  const email = 'throttle-probe@genomika.mk';          // no such account
+  let sawThrottle = false;
+  for (let i = 0; i < 12; i++) {
+    const { status } = await json('/auth/login', { method: 'POST', body: { email, password: 'wrong' } });
+    if (status === 429) { sawThrottle = true; break; }
+    assert.equal(status, 401);
+  }
+  assert.ok(sawThrottle, 'guessing must be refused before twelve attempts');
+
+  // A different address is unaffected — the limit is not global.
+  const other = await json('/auth/login', {
+    method: 'POST', body: { email: 'admin@genomika.mk', password: 'genomika2026' } });
+  assert.equal(other.status, 200);
+});
+
+test('an administrator can download a stored CV, and only an administrator', async () => {
+  const pdf = Buffer.concat([Buffer.from('%PDF-1.4 '), Buffer.from('downloadable')]).toString('base64');
+  const applied = await json('/positions/rse-webtools/apply', {
+    method: 'POST',
+    body: { name: 'Downloadable Candidate', email: 'dl@example.mk',
+            motivation: 'A motivation letter comfortably past the minimum length requirement.',
+            cv: { name: 'mycv.pdf', type: 'application/pdf', size: 24, data: `data:application/pdf;base64,${pdf}` } }
+  });
+  assert.equal(applied.status, 201);
+
+  const token = await signIn('admin@genomika.mk');
+  const list = (await json('/admin/overview', { token })).body.recentApplications;
+  const row = list.find(a => a.email === 'dl@example.mk');
+  assert.ok(row?.cv_filename, 'the filename is recorded');
+
+  assert.equal((await call(`/admin/applications/${row.id}/cv`)).status, 401);
+  const researcher = await signIn('n.avramovski@genomika.mk');
+  assert.equal((await call(`/admin/applications/${row.id}/cv`, { token: researcher })).status, 403);
+
+  const res = await call(`/admin/applications/${row.id}/cv`, { token });
+  assert.equal(res.status, 200);
+  const body = await res.text();
+  assert.match(body, /^%PDF-1\.4/, 'the stored bytes come back');
+});
+
+test('a CV download is refused for an application that has none', async () => {
+  const token = await signIn('admin@genomika.mk');
+  const applied = await json('/positions/intern-summer-2026/apply', {
+    method: 'POST',
+    body: { name: 'No Attachment', email: 'noattach@example.mk',
+            motivation: 'A motivation letter comfortably past the minimum length requirement.' }
+  });
+  assert.equal(applied.status, 201);
+  const list = (await json('/admin/overview', { token })).body.recentApplications;
+  const row = list.find(a => a.email === 'noattach@example.mk');
+  const { status, body } = await json(`/admin/applications/${row.id}/cv`, { token });
+  assert.equal(status, 404);
+  assert.equal(body.error, 'no_cv_attached');
+});
+
+test('admin inbox actions report a missing record instead of claiming success', async () => {
+  const token = await signIn('admin@genomika.mk');
+  assert.equal((await json('/admin/messages/999999/handled', { token, method: 'PUT', body: { handled: true } })).status, 404);
+  assert.equal((await json('/admin/applications/999999/status', { token, method: 'PUT', body: { status: 'shortlisted' } })).status, 404);
+});
+
+test('a server error does not return the exception text', async () => {
+  // A malformed JSON body trips the body parser, which the error handler owns.
+  const res = await fetch(base + '/messages', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{ not json'
+  });
+  assert.ok(res.status >= 400);
+  const text = await res.text();
+  assert.ok(!/at Object|node_modules|\/Users\//.test(text), 'no stack or path detail reaches the client');
+});
+
 /* ------------------------------------------------------------- MESSAGES -- */
 
 test('the contact form validates before storing', async () => {

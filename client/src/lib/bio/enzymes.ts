@@ -32,7 +32,18 @@ export const ENZYMES: Enzyme[] = [
   { name: 'NotI',    site: 'GC^GGCCGC', supplier: 'N. otitidis',         overhang: "5'" },
   { name: 'HaeIII',  site: 'GG^CC',     supplier: 'H. aegyptius',        overhang: 'blunt' },
   { name: 'AluI',    site: 'AG^CT',     supplier: 'A. luteus',           overhang: 'blunt' },
-  { name: 'TaqI',    site: 'T^CGA',     supplier: 'T. aquaticus',        overhang: "5'" }
+  { name: 'TaqI',    site: 'T^CGA',     supplier: 'T. aquaticus',        overhang: "5'" },
+
+  /*
+   * The five below recognise degenerate sites, written in IUPAC notation:
+   * N is any base, W is A or T, Y is C or T, R is A or G. They are what the
+   * IUPAC table below is for — without them the expansion is dead code.
+   */
+  { name: 'HinfI',   site: 'G^ANTC',    supplier: 'H. influenzae Rf',    overhang: "5'" },
+  { name: 'AvaII',   site: 'G^GWCC',    supplier: 'A. variabilis',       overhang: "5'" },
+  { name: 'BstYI',   site: 'R^GATCY',   supplier: 'B. stearothermophilus', overhang: "5'" },
+  { name: 'DdeI',    site: 'C^TNAG',    supplier: 'D. desulfuricans',    overhang: "5'" },
+  { name: 'ScrFI',   site: 'CC^NGG',    supplier: 'S. cremoris',         overhang: 'blunt' }
 ];
 
 const IUPAC: Record<string, string> = {
@@ -84,13 +95,22 @@ export type Fragment = {
   length: number;
   leftEnzyme: string | null;
   rightEnzyme: string | null;
+  /**
+   * True for the one fragment of a circular digest that runs past the end of
+   * the sequence and continues from position 1. Its `end` is therefore lower
+   * than its `start`, and a reader that ignores this flag will misread the
+   * coordinates as inverted.
+   */
+  wraps?: boolean;
 };
 
 /** Cuts a linear or circular sequence at the given sites. */
 export function digest(seq: string, sites: CutSite[], circular = false): Fragment[] {
   if (!seq.length) return [];
+  // A cut at position 0 splits nothing on a linear molecule, but on a circle
+  // it is an ordinary cut like any other.
   const unique = [...new Map(sites.map(s => [s.position, s])).values()]
-    .filter(s => s.position > 0 && s.position < seq.length)
+    .filter(s => (circular ? s.position >= 0 : s.position > 0) && s.position < seq.length)
     .sort((a, b) => a.position - b.position);
 
   if (unique.length === 0) {
@@ -106,12 +126,14 @@ export function digest(seq: string, sites: CutSite[], circular = false): Fragmen
       const length = i === unique.length - 1
         ? seq.length - from.position + to.position
         : to.position - from.position;
+      const wraps = i === unique.length - 1 && unique.length > 1;
       fragments.push({
         start: from.position + 1,
-        end: i === unique.length - 1 ? to.position : to.position,
+        end: to.position === 0 ? seq.length : to.position,
         length,
         leftEnzyme: from.enzyme,
-        rightEnzyme: to.enzyme
+        rightEnzyme: to.enzyme,
+        ...(wraps ? { wraps: true } : {})
       });
     }
     return fragments.sort((a, b) => b.length - a.length);

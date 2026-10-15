@@ -7,6 +7,8 @@
  */
 
 export const DNA_ALPHABET = 'ACGTUN';
+/** Includes the IUPAC degenerate codes, for input a restriction site can match. */
+export const IUPAC_DNA_ALPHABET = 'ACGTUNRYSWKMBDHV';
 
 export type SeqKind = 'dna' | 'rna' | 'protein' | 'unknown';
 export type ParsedFasta = { id: string; description: string; seq: string };
@@ -88,11 +90,26 @@ export function gcContent(seq: string) {
   return (G + C) / seq.length;
 }
 
-/** Average molecular weight of single-stranded DNA, in daltons. */
+/*
+ * Average molecular weight of a single strand, in daltons.
+ *
+ * These are *residue* masses, not free nucleotide masses: forming each
+ * phosphodiester bond releases a molecule of water, so a residue weighs
+ * 18.02 Da less than the free monophosphate it came from. Using the free
+ * masses — as an earlier version of this function did — overstates the
+ * result by 18.02 Da for every bond in the chain.
+ *
+ * The trailing −61.96 converts from a 5'-monophosphate to the 5'-hydroxyl an
+ * ordinary synthesised oligo carries. Values match OligoCalc.
+ */
+const DNA_RESIDUE_MASS: Record<string, number> = { A: 313.21, T: 304.20, G: 329.21, C: 289.18, N: 308.95 };
+const RNA_RESIDUE_MASS: Record<string, number> = { A: 329.21, U: 306.17, G: 345.21, C: 305.18, N: 321.44 };
+
 export function molecularWeight(seq: string) {
-  const w: Record<string, number> = { A: 331.2, T: 322.2, G: 347.2, C: 307.2, U: 324.2, N: 327.0 };
-  const total = seq.split('').reduce((sum, ch) => sum + (w[ch] ?? 0), 0);
-  return seq.length ? total - 61.96 : 0; // one phosphate removed for the 5' end
+  if (!seq.length) return 0;
+  const table = seq.includes('U') && !seq.includes('T') ? RNA_RESIDUE_MASS : DNA_RESIDUE_MASS;
+  const total = seq.split('').reduce((sum, ch) => sum + (table[ch] ?? 0), 0);
+  return total - 61.96;
 }
 
 /**
@@ -102,8 +119,11 @@ export function molecularWeight(seq: string) {
 export function meltingTemp(seq: string) {
   const n = seq.length;
   if (!n) return 0;
-  const { A, T, G, C } = baseCounts(seq);
-  if (n < 14) return 2 * (A + T) + 4 * (G + C);
+  const { A, T, U, G, C } = baseCounts(seq);
+  // U pairs with A exactly as T does; counting it separately silently gave
+  // RNA a different melting temperature from the identical DNA sequence.
+  const weak = A + T + U;
+  if (n < 14) return 2 * weak + 4 * (G + C);
   return 64.9 + (41 * (G + C - 16.4)) / n;
 }
 

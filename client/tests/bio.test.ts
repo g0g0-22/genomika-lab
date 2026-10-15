@@ -11,9 +11,10 @@ import assert from 'node:assert/strict';
 
 import {
   reverseComplement, complement, transcribe, translate, translateAllFrames, findOrfs,
-  gcContent, meltingTemp, parseFasta, cleanSequence, detectKind, toFasta
+  gcContent, meltingTemp, molecularWeight, parseFasta, cleanSequence, detectKind, toFasta,
+  IUPAC_DNA_ALPHABET
 } from '../src/lib/bio/sequence.ts';
-import { ENZYMES, findCutSites, digest, migration } from '../src/lib/bio/enzymes.ts';
+import { ENZYMES, findCutSites, digest, migration, recognitionSequence } from '../src/lib/bio/enzymes.ts';
 import { HBB_CDS, PLASMID_FRAGMENT } from '../src/lib/bio/samples.ts';
 
 /* ------------------------------------------------------------- sequence -- */
@@ -53,6 +54,30 @@ test('GC content and melting temperature', () => {
   assert.ok(Math.abs(meltingTemp('GCGCGCGCGCGCGCGCGCGC') - 72.28) < 0.01);
 });
 
+test('molecular weight uses residue masses, not free nucleotide masses', () => {
+  // Forming each phosphodiester bond releases water, so a residue weighs
+  // 18.02 Da less than the free monophosphate. Expected values are OligoCalc's.
+  assert.ok(Math.abs(molecularWeight('ATGC') - 1173.84) < 0.01);
+  assert.ok(Math.abs(molecularWeight('AAAA') - 1190.88) < 0.01);
+  assert.equal(molecularWeight(''), 0);
+
+  // A single residue carries no bond at all, so it is just the residue mass
+  // less the 5'-phosphate adjustment.
+  assert.ok(Math.abs(molecularWeight('A') - (313.21 - 61.96)) < 0.01);
+
+  // Each added base must raise the mass by exactly one residue, never more.
+  const step = molecularWeight('AA') - molecularWeight('A');
+  assert.ok(Math.abs(step - 313.21) < 0.01, 'no water is left on the chain');
+
+  // RNA residues are heavier than their DNA counterparts.
+  assert.ok(molecularWeight('AUGC') > molecularWeight('ATGC'));
+});
+
+test('melting temperature does not depend on whether the strand is DNA or RNA', () => {
+  assert.equal(meltingTemp('ATGC'), meltingTemp('AUGC'));
+  assert.equal(meltingTemp('ATATATATATATATATAT'), meltingTemp('AUAUAUAUAUAUAUAUAU'));
+});
+
 test('cleaning drops characters outside the alphabet', () => {
   const { seq, dropped } = cleanSequence('atg-cxz 123');
   assert.equal(seq, 'ATGC');
@@ -84,6 +109,52 @@ test('all six reading frames are produced', () => {
   const frames = translateAllFrames(HBB_CDS);
   assert.equal(frames.length, 6);
   assert.deepEqual(frames.map(f => f.frame), [3, 2, 1, -1, -2, -3]);
+});
+
+test('the IUPAC alphabet survives cleaning when it is asked for', () => {
+  assert.deepEqual(cleanSequence('ATGCRYKM'), { seq: 'ATGC', dropped: 4 });
+  assert.deepEqual(cleanSequence('ATGCRYKM', IUPAC_DNA_ALPHABET), { seq: 'ATGCRYKM', dropped: 0 });
+});
+
+test('degenerate recognition sites match every base they stand for', () => {
+  const hinfI = ENZYMES.find(e => e.name === 'HinfI')!;   // G^ANTC — N is any base
+  assert.equal(recognitionSequence(hinfI), 'GANTC');
+  for (const n of ['A', 'C', 'G', 'T']) {
+    assert.equal(findCutSites(`TTG${n === 'A' ? 'GAATC' : `GA${n}TC`}TT`, [hinfI]).length, 1, `N = ${n}`);
+  }
+
+  const bstYI = ENZYMES.find(e => e.name === 'BstYI')!;   // R^GATCY — R is A/G, Y is C/T
+  assert.equal(findCutSites('TTAGATCCTT', [bstYI]).length, 1);
+  assert.equal(findCutSites('TTGGATCTTT', [bstYI]).length, 1);
+  assert.equal(findCutSites('TTCGATCATT', [bstYI]).length, 0, 'C is not R and A is not Y');
+
+  // The table would be dead code if no shipped enzyme used it.
+  const degenerate = ENZYMES.filter(e => /[RYSWKMBDHVN]/.test(recognitionSequence(e)));
+  assert.ok(degenerate.length >= 5);
+});
+
+test('a circular digest conserves length and marks the fragment crossing the origin', () => {
+  const enzymes = ENZYMES.filter(e => ['EcoRI', 'BamHI'].includes(e.name));
+  const sites = findCutSites(PLASMID_FRAGMENT, enzymes);
+  const fragments = digest(PLASMID_FRAGMENT, sites, true);
+
+  assert.equal(fragments.reduce((sum, f) => sum + f.length, 0), PLASMID_FRAGMENT.length);
+  assert.equal(fragments.length, sites.length, 'n cuts on a circle give n fragments');
+
+  const wrapping = fragments.filter(f => f.wraps);
+  assert.equal(wrapping.length, 1, 'exactly one fragment crosses the origin');
+  assert.ok(wrapping[0].end < wrapping[0].start, 'and it is the only one whose end precedes its start');
+  fragments.filter(f => !f.wraps).forEach(f =>
+    assert.ok(f.start <= f.end, 'every other fragment reads forwards'));
+});
+
+test('a linear digest of the same sequence gives one more fragment than cuts', () => {
+  const enzymes = ENZYMES.filter(e => ['EcoRI', 'BamHI'].includes(e.name));
+  const sites = findCutSites(PLASMID_FRAGMENT, enzymes).filter(s => s.position > 0);
+  const fragments = digest(PLASMID_FRAGMENT, findCutSites(PLASMID_FRAGMENT, enzymes), false);
+  assert.equal(fragments.length, sites.length + 1);
+  assert.ok(fragments.every(f => !f.wraps));
+  assert.equal(fragments.reduce((sum, f) => sum + f.length, 0), PLASMID_FRAGMENT.length);
 });
 
 test('EcoRI cuts the demo fragment exactly twice', () => {

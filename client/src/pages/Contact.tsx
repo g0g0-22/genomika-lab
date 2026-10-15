@@ -82,10 +82,10 @@ export default function Contact() {
           <Card className="p-5">
             <Label>{t('con.address')}</Label>
             <address className="mt-2.5 not-italic text-[13.5px] leading-relaxed text-ink2">
-              {lang === 'mk' ? 'ГеномикаЛаб' : 'GenomikaLab'}<br />
-              {lang === 'mk' ? 'ул. Руѓер Бошковиќ бр. 16' : 'Rugjer Boshkovikj 16'}<br />
-              1000 {lang === 'mk' ? 'Скопје' : 'Skopje'}<br />
-              {lang === 'mk' ? 'Северна Македонија' : 'North Macedonia'}
+              {t('brand.name')}<br />
+              {t('con.street')}<br />
+              {t('con.city')}<br />
+              {t('con.country')}
             </address>
             <DnaStrip seed="contact" count={34} className="mt-5 opacity-40" />
           </Card>

@@ -15,6 +15,42 @@ export const JWT_SECRET = process.env.JWT_SECRET
   || 'local-development-only-do-not-deploy';
 const TOKEN_TTL = '8h';
 
+/*
+ * Credential guessing is throttled per address. bcryptjs is pure JavaScript and
+ * compares synchronously, so an unthrottled login endpoint is both an open
+ * guessing surface and a way to occupy the event loop with a single stream of
+ * requests. The window is deliberately short — this protects the service, it is
+ * not an account-lockout policy.
+ */
+const ATTEMPT_LIMIT = 8;
+const ATTEMPT_WINDOW_MS = 60_000;
+const attempts = new Map();
+
+export function throttleKey(req, email) {
+  return `${req.ip ?? 'unknown'}|${String(email || '').toLowerCase().trim()}`;
+}
+
+export function tooManyAttempts(key) {
+  const entry = attempts.get(key);
+  if (!entry) return false;
+  if (Date.now() - entry.first > ATTEMPT_WINDOW_MS) { attempts.delete(key); return false; }
+  return entry.count >= ATTEMPT_LIMIT;
+}
+
+export function recordFailure(key) {
+  const now = Date.now();
+  const entry = attempts.get(key);
+  if (!entry || now - entry.first > ATTEMPT_WINDOW_MS) attempts.set(key, { first: now, count: 1 });
+  else entry.count++;
+
+  // The map is bounded so a stream of distinct addresses cannot grow it forever.
+  if (attempts.size > 5000) {
+    for (const [k, v] of attempts) if (now - v.first > ATTEMPT_WINDOW_MS) attempts.delete(k);
+  }
+}
+
+export const clearAttempts = (key) => attempts.delete(key);
+
 export function authenticate(email, password) {
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(String(email || '').toLowerCase().trim());
   if (!user) return null;

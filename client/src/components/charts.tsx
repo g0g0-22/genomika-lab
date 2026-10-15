@@ -257,7 +257,7 @@ export function Gantt({ rows, formatDate }: { rows: GanttRow[]; formatDate: (iso
   return (
     <div className="relative" ref={ref} onMouseLeave={hide}>
       <div className="relative mb-2 h-4">
-        {years.map(y => (
+        {years.map(y => pct(`${y}-01-01`) >= 0 && pct(`${y}-01-01`) <= 100 && (
           <span key={y} className="num text-[9px] text-muted absolute -translate-x-1/2"
                 style={{ left: `${pct(`${y}-01-01`)}%` }}>
             {y}
@@ -284,9 +284,6 @@ export function Gantt({ rows, formatDate }: { rows: GanttRow[]; formatDate: (iso
               role="img"
               aria-label={`${r.label}: ${formatDate(r.start)} – ${formatDate(r.end)}`}
             />
-            <span className="absolute left-0 text-[11px] text-ink2 truncate max-w-[42%] pointer-events-none"
-                  style={{ left: `calc(${pct(r.start)}% + 8px)`, opacity: pct(r.end) - pct(r.start) > 22 ? 0 : 1 }}>
-            </span>
           </div>
         ))}
       </div>

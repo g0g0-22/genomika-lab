@@ -8,7 +8,7 @@ import {
   ENZYMES, findCutSites, digest, recognitionSequence, migration,
   LADDER_1KB, LADDER_100BP, GEL_RANGES, type Enzyme
 } from '../../lib/bio/enzymes';
-import { cleanSequence, parseFasta } from '../../lib/bio/sequence';
+import { cleanSequence, parseFasta, IUPAC_DNA_ALPHABET } from '../../lib/bio/sequence';
 import { PLASMID_FRAGMENT } from '../../lib/bio/samples';
 
 const GEL_HEIGHT = 380;
@@ -25,7 +25,7 @@ export default function Gel() {
   const [runId, setRunId] = useState(0);
 
   const seq = useMemo(
-    () => cleanSequence(parseFasta(input).map(r => r.seq).join('')).seq,
+    () => cleanSequence(parseFasta(input).map(r => r.seq).join(''), IUPAC_DNA_ALPHABET).seq,
     [input]
   );
 
@@ -55,9 +55,9 @@ export default function Gel() {
     setSelected(list => (list.includes(name) ? list.filter(n => n !== name) : [...list, name]));
 
   const exportFragments = () => {
-    const header = 'fragment,start,end,length_bp,left_enzyme,right_enzyme\n';
+    const header = 'fragment,start,end,length_bp,left_enzyme,right_enzyme,wraps_origin\n';
     const body = fragments
-      .map((f, i) => `${i + 1},${f.start},${f.end},${f.length},${f.leftEnzyme ?? ''},${f.rightEnzyme ?? ''}`)
+      .map((f, i) => `${i + 1},${f.start},${f.end},${f.length},${f.leftEnzyme ?? ''},${f.rightEnzyme ?? ''},${f.wraps ? 'yes' : 'no'}`)
       .join('\n');
     download('digest-fragments.csv', header + body, 'text/csv');
   };
@@ -125,10 +125,13 @@ export default function Gel() {
               <p className="label">{formatNumber(minBp)} – {formatNumber(maxBp)} bp</p>
               <div className="rule pt-4">
                 <Toggle
-                  ariaLabel="topology"
+                  ariaLabel={t('gel.topology')}
                   value={topology}
                   onChange={setTopology}
-                  options={[{ value: 'linear', label: 'linear' }, { value: 'circular', label: 'circular' }]}
+                  options={[
+                    { value: 'linear', label: t('gel.linear') },
+                    { value: 'circular', label: t('gel.circular') }
+                  ]}
                 />
               </div>
               <button className="btn btn-primary w-full justify-center" onClick={() => setRunId(n => n + 1)} disabled={!seq}>
@@ -296,7 +299,7 @@ export default function Gel() {
 
                   <div className="flex justify-between gap-4 mt-3">
                     <span className="label">{t('gel.ladder')}</span>
-                    <span className="label">{agarose}% {t('gel.agarose')} · {topology}</span>
+                    <span className="label">{agarose}% {t('gel.agarose')} · {t(`gel.${topology}` as any)}</span>
                   </div>
 
                   {(ranOff.length > 0 || stuck.length > 0) && (
@@ -335,7 +338,12 @@ export default function Gel() {
                           <tr key={i} className="border-b border-linesoft">
                             <td className="py-2 num text-muted">{i + 1}</td>
                             <td className="py-2 num">{formatNumber(fragment.start)}</td>
-                            <td className="py-2 num">{formatNumber(fragment.end)}</td>
+                            <td className="py-2 num">
+                              {formatNumber(fragment.end)}
+                              {fragment.wraps && (
+                                <span className="text-muted ml-1.5" title={t('gel.wraps')}>↩</span>
+                              )}
+                            </td>
                             <td className="py-2 num text-accent">{formatNumber(fragment.length)}</td>
                             <td className="py-2 num text-[11px] text-muted">
                               {fragment.leftEnzyme ?? '—'} / {fragment.rightEnzyme ?? '—'}

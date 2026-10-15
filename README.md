@@ -66,20 +66,20 @@ npm run dev:client    # Vite на :5173, со proxy кон :4000
 npm test
 ```
 
-**43 теста** во две нивоа:
+**54 теста** во две нивоа:
 
-* **14** ја покриваат алгоритамската библиотека — парсирање FASTA, транслација, наоѓање отворени рамки на читање и рестрикциска дигестија — со очекувани вредности проверливи наспрема која било референтна имплементација.
-* **29** го возат вистинскиот HTTP слој врз привремена база: автентикација, авторизација, преклопување резервации, валидација на прикачени датотеки, приватност на податоците и пребарување. Ништо не е мокирано.
+* **20** ја покриваат алгоритамската библиотека — парсирање FASTA, транслација, наоѓање отворени рамки на читање и рестрикциска дигестија — со очекувани вредности проверливи наспрема која било референтна имплементација.
+* **34** го возат вистинскиот HTTP слој врз привремена база: автентикација, авторизација, преклопување резервации, валидација на прикачени датотеки, приватност на податоците и пребарување. Ништо не е мокирано.
 
 ```bash
 npm run test:client     # алгоритми
 npm run test:server     # API
 ```
 
-**43 tests** at two levels:
+**54 tests** at two levels:
 
-* **14** cover the algorithm library — FASTA parsing, translation, open-reading-frame detection and restriction digestion — with expected values checkable against any reference implementation.
-* **29** drive the real HTTP layer against a throwaway database: authentication, authorisation, booking overlap, upload validation, data privacy and search. Nothing is mocked.
+* **20** cover the algorithm library — FASTA parsing, translation, open-reading-frame detection and restriction digestion — with expected values checkable against any reference implementation.
+* **34** drive the real HTTP layer against a throwaway database: authentication, authorisation, booking overlap, upload validation, data privacy and search. Nothing is mocked.
 
 ---
 
@@ -89,6 +89,10 @@ npm run test:server     # API
 |---|---|---|
 | Администратор / Administrator | `admin@genomika.mk` | `genomika2026` |
 | Истражувач / Researcher | `n.avramovski@genomika.mk` | `genomika2026` |
+
+Seed-от создава четири сметки, од кои **две** се администратори
+(`admin@genomika.mk` и `f.micevski@genomika.mk`). / The seed creates four
+accounts, **two** of which are administrators.
 
 Најавата е потребна за резервации; администрацијата бара улога `admin`.
 Sign-in is required for bookings; administration requires the `admin` role.
@@ -104,7 +108,7 @@ All computation happens in the browser — not one byte of an entered sequence i
 | Алатка / Tool | Алгоритми / Algorithms |
 |---|---|
 | **Секвенцна работилница** / Sequence Toolkit | Комплемент, транскрипција, транслација во 6 рамки, наоѓање ORF, GC содржина, Tm (Wallace / GC-формула), молекуларна маса |
-| **Виртуелна електрофореза** / Virtual Electrophoresis | 20 рестрикциски ензими со IUPAC препознавање, дигестија на линеарна и кружна ДНК, симулиран агарозен гел (0.7–2.0 %) со логаритамска миграција и експлицитно означување на фрагментите што излегуваат од опсегот на гелот |
+| **Виртуелна електрофореза** / Virtual Electrophoresis | 25 рестрикциски ензими, од кои пет со дегенерирани IUPAC места, дигестија на линеарна и кружна ДНК, симулиран агарозен гел (0.7–2.0 %) со логаритамска миграција и експлицитно означување на фрагментите што излегуваат од опсегот на гелот |
 
 ### Проверливост / Verifiability
 
@@ -116,6 +120,7 @@ Results are checkable against reference implementations:
 * `EcoRI` (`G^AATTC`) во демо-конструктот → точно две места на сечење, на позиции 1 и 46
 * Дигестија со повеќе ензими → збирот на должините на фрагментите е секогаш еднаков на должината на влезната секвенца
 * `meltingTemp('GCGCGCGCGCGCGCGCGCGC')` → 72.28 °C по GC-формулата
+* `molecularWeight('ATGC')` → 1173.84 Da, идентично со OligoCalc (резидуални маси, не маси на слободни нуклеотиди)
 
 ---
 
@@ -125,7 +130,7 @@ Results are checkable against reference implementations:
 genomika-lab/
 ├── server/                  Express + SQLite (better-sqlite3), ESM
 │   └── src/
-│       ├── tests/api.test.js  29 интеграциски теста врз вистинскиот HTTP слој
+│       ├── tests/api.test.js  34 интеграциски теста врз вистинскиот HTTP слој
 │       ├── app.js           Склопување на апликацијата (без слушање порта)
 │       ├── db.js            Шема на базата — 17 табели
 │       ├── seed.js          Двојазични демо податоци
@@ -139,13 +144,13 @@ genomika-lab/
 │           └── admin.js     CRUD зад улога `admin`
 │
 └── client/                  React 18 + TypeScript + Vite + Tailwind v4
-    ├── tests/bio.test.ts    14 теста за алгоритамската библиотека
+    ├── tests/bio.test.ts    20 теста за алгоритамската библиотека
     └── src/
         ├── lib/bio/         ★ Алгоритамска библиотека — без надворешни зависности
         │   ├── sequence.ts    Секвенцни операции, кодонска табела, ORF
         │   ├── enzymes.ts     Рестрикциски ензими, дигестија, миграција на гел
         │   └── samples.ts     Примероци за двете алатки
-        ├── i18n/dict.ts     311 двојазични записи во една рамна табела
+        ├── i18n/dict.ts     325 двојазични записи во една рамна табела
         ├── components/      Дизајн систем, графикони, мрежен граф, приказ на секвенци
         └── pages/           18 страници
 ```
@@ -290,7 +295,7 @@ moment of deployment — events and bookings always look current. Set
 
 | Променлива / Variable | Default | Што прави / What it does |
 |---|---|---|
-| `JWT_SECRET` | dev fallback | Потпишување на токени — **постави ја на RepoRun** |
+| `JWT_SECRET` | **нема** / none | Потпишување на токени. Серверот одбива да стартува во продукција без неа |
 | `AUTO_SEED` | `true` | Полнење на празна база при прво подигање |
 | `DB_PATH` | `/data/genomika.db` | SQLite датотека, на именуван волумен |
 | `UPLOAD_DIR` | `/data/uploads` | Прикачени биографии, на истиот волумен |
