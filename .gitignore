@@ -8,3 +8,5 @@ server/uploads/
 .env
 *.log
 *.tsbuildinfo
+i18n-review.json
+i18n-review.json.orig

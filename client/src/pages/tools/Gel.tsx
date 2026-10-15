@@ -38,7 +38,15 @@ export default function Gel() {
   );
 
   const [minBp, maxBp] = GEL_RANGES[agarose];
-  const ladder = maxBp <= 4000 ? LADDER_100BP : LADDER_1KB;
+
+  // A gel only resolves a band of lengths. Anything shorter runs off the
+  // front, anything longer never leaves the well — show both honestly rather
+  // than clamping everything onto the same line.
+  const inRange = (n: number) => n >= minBp && n <= maxBp;
+  const ladder = (maxBp <= 4000 ? LADDER_100BP : LADDER_1KB).filter(inRange);
+  const resolved = fragments.filter(f => inRange(f.length));
+  const ranOff = fragments.filter(f => f.length < minBp);
+  const stuck = fragments.filter(f => f.length > maxBp);
 
   const toggleEnzyme = (name: string) =>
     setSelected(list => (list.includes(name) ? list.filter(n => n !== name) : [...list, name]));
@@ -52,6 +60,25 @@ export default function Gel() {
   };
 
   const bandY = (length: number) => 26 + migration(length, minBp, maxBp) * (GEL_HEIGHT - 56);
+
+  /**
+   * Cut sites cluster — three enzymes inside the first 50 bases of an 800 bp
+   * construct is normal. Stack their labels on as many rows as it takes so no
+   * two ever overlap, rather than rotating them and hoping.
+   */
+  const tiers = useMemo(() => {
+    const APPROX_LABEL_PX = 58;
+    const trackPx = 760;
+    const lastEndOnTier: number[] = [];
+    const of = sites.map(site => {
+      const x = (site.position / Math.max(seq.length, 1)) * trackPx;
+      let tier = lastEndOnTier.findIndex(end => x > end);
+      if (tier === -1) { tier = lastEndOnTier.length; }
+      lastEndOnTier[tier] = x + APPROX_LABEL_PX;
+      return tier;
+    });
+    return { of, count: Math.max(lastEndOnTier.length, 1) };
+  }, [sites, seq.length]);
 
   return (
     <ToolShell index="05.3 / GEL" name="tool.gel.name" desc="tool.gel.desc">
@@ -141,54 +168,73 @@ export default function Gel() {
             <>
               {/* -------------------------------------------- sequence map */}
               <Panel title={t('gel.map')}>
-                <div className="relative h-24 mt-2">
-                  <div className="absolute inset-x-0 top-10 h-2.5 rounded-[3px] bg-bg3 border border-line" />
-                  {sites.map((site, i) => {
-                    const left = (site.position / seq.length) * 100;
-                    return (
-                      <div key={i} className="absolute top-0" style={{ left: `${left}%` }}>
-                        <div className="w-px h-10 bg-accent" />
-                        <div className="w-px h-6 bg-accent/50 mt-2.5" />
-                        <span
-                          className="num text-[9px] text-accent absolute top-0 -translate-x-1/2 whitespace-nowrap"
-                          style={{ transform: `translateX(-50%) rotate(-42deg)`, transformOrigin: 'bottom left' }}
-                        >
-                          {site.enzyme}
-                        </span>
-                        <span className="num text-[9px] text-muted absolute top-[74px] -translate-x-1/2">
-                          {site.position}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  <span className="num text-[10px] text-muted absolute right-0 top-[54px]">
-                    {formatNumber(seq.length)} bp
-                  </span>
-                </div>
-                {sites.length === 0 && <Notice>{t('gel.nosites')}</Notice>}
+                {sites.length === 0 ? (
+                  <Notice>{t('gel.nosites')}</Notice>
+                ) : (
+                  <div className="relative mt-2" style={{ height: 36 + tiers.count * 16 }}>
+                    {/* the sequence itself */}
+                    <div
+                      className="absolute inset-x-0 h-[6px] bg-bg3 border border-line"
+                      style={{ top: tiers.count * 16 + 6 }}
+                    />
+
+                    {sites.map((site, i) => {
+                      const left = (site.position / seq.length) * 100;
+                      const tier = tiers.of[i];
+                      const labelTop = tier * 16;
+                      const barTop = tiers.count * 16 + 6;
+                      return (
+                        <div key={i} className="absolute top-0" style={{ left: `${left}%` }}>
+                          {/* leader from the label down to the cut */}
+                          <div
+                            className="absolute w-px bg-line"
+                            style={{ top: labelTop + 12, height: barTop - labelTop - 12 }}
+                          />
+                          {/* the cut itself */}
+                          <div className="absolute w-px bg-accent" style={{ top: barTop, height: 6 }} />
+                          <span
+                            className="absolute text-[10px] whitespace-nowrap text-ink2"
+                            style={{ top: labelTop, left: 4 }}
+                          >
+                            {site.enzyme}
+                          </span>
+                          <span
+                            className="absolute num text-[9px] text-muted whitespace-nowrap"
+                            style={{ top: barTop + 10, left: 4 }}
+                          >
+                            {site.position}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    <span
+                      className="num text-[10px] text-muted absolute right-0"
+                      style={{ top: tiers.count * 16 + 16 }}
+                    >
+                      {formatNumber(seq.length)} bp
+                    </span>
+                  </div>
+                )}
               </Panel>
 
               {/* --------------------------------------------------- the gel */}
-              <div className="grid gap-6 md:grid-cols-[300px_minmax(0,1fr)]">
+              <div className="grid gap-6 md:grid-cols-[320px_minmax(0,1fr)] items-start">
                 <Panel title={t('gel.lane')}>
                   <div
                     key={runId}
-                    className="relative rounded-[3px] overflow-hidden"
-                    style={{
-                      height: GEL_HEIGHT,
-                      background: 'linear-gradient(180deg, #0d1512 0%, #0a100e 100%)',
-                      border: '1px solid var(--line)'
-                    }}
+                    className="relative overflow-hidden"
+                    style={{ height: GEL_HEIGHT, background: 'linear-gradient(180deg,#17181A 0%,#0E0F10 100%)' }}
                   >
-                    {/* wells */}
+                    {/* loading wells */}
                     {[0, 1].map(lane => (
                       <div
                         key={lane}
-                        className="absolute rounded-[2px]"
+                        className="absolute"
                         style={{
                           left: 18 + lane * (LANE_WIDTH + 26),
-                          top: 12, width: LANE_WIDTH, height: 9,
-                          background: '#050807', border: '1px solid #1d2a25'
+                          top: 10, width: LANE_WIDTH, height: 7,
+                          background: '#09090A', boxShadow: 'inset 0 0 0 1px #2A2C2E'
                         }}
                       />
                     ))}
@@ -197,61 +243,82 @@ export default function Gel() {
                     {ladder.map((size, i) => (
                       <div key={`L${size}`} className="absolute" style={{ left: 18, top: bandY(size) }}>
                         <div
-                          className="rounded-[1px]"
                           style={{
-                            width: LANE_WIDTH,
-                            height: 3,
-                            background: '#7f8f88',
-                            boxShadow: '0 0 6px rgba(160,180,170,.5)',
-                            animation: `migrate .9s cubic-bezier(.2,.7,.3,1) both`,
+                            width: LANE_WIDTH, height: 2,
+                            background: '#8C8F90',
+                            boxShadow: '0 0 4px rgba(190,195,195,.3)',
+                            animation: 'migrate .9s cubic-bezier(.2,.7,.3,1) both',
                             animationDelay: `${i * 45}ms`
                           }}
                         />
-                        <span className="num absolute -left-1 -translate-x-full text-[9px] text-muted whitespace-nowrap"
-                              style={{ top: -4 }}>
+                        <span className="num absolute -left-2 -translate-x-full text-[9px] text-white/40 whitespace-nowrap" style={{ top: -5 }}>
                           {size >= 1000 ? `${size / 1000}k` : size}
                         </span>
                       </div>
                     ))}
 
-                    {/* sample */}
-                    {fragments.map((fragment, i) => {
-                      const intensity = Math.min(0.35 + fragment.length / (seq.length || 1), 1);
+                    {/* sample — only what this gel resolves */}
+                    {resolved.map((fragment, i) => {
+                      const weight = Math.min(fragment.length / (seq.length || 1), 1);
                       return (
                         <div
                           key={`F${i}`}
-                          className="absolute rounded-[1px] group"
+                          className="absolute group"
                           style={{
                             left: 18 + LANE_WIDTH + 26,
                             top: bandY(fragment.length),
                             width: LANE_WIDTH,
-                            height: 3 + intensity * 3,
-                            background: `rgba(158,230,75,${0.45 + intensity * 0.5})`,
-                            boxShadow: `0 0 ${6 + intensity * 8}px rgba(158,230,75,${0.35 + intensity * 0.4})`,
+                            height: 2.5 + weight * 3,
+                            background: `rgba(206,222,208,${0.55 + weight * 0.4})`,
+                            boxShadow: `0 0 ${5 + weight * 7}px rgba(168,191,172,${0.3 + weight * 0.3})`,
                             animation: 'migrate 1.1s cubic-bezier(.2,.7,.3,1) both',
                             animationDelay: `${300 + i * 60}ms`
                           }}
                           title={`${fragment.length} bp`}
                         >
-                          <span className="num absolute left-full ml-2 text-[9px] text-accent/80 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity"
-                                style={{ top: -4 }}>
+                          <span className="num absolute left-full ml-2 text-[9px] text-white/70 whitespace-nowrap" style={{ top: -4 }}>
                             {formatNumber(fragment.length)}
                           </span>
                         </div>
                       );
                     })}
 
-                    <span className="num absolute bottom-2 left-[18px] text-[9px] text-muted">{t('gel.ladder')}</span>
-                    <span className="num absolute bottom-2 text-[9px] text-accent"
-                          style={{ left: 18 + LANE_WIDTH + 26 }}>
-                      {sites.length ? t('gel.fragments') : t('gel.uncut')}
-                    </span>
+                    {/* the gel front: everything shorter has run past it */}
+                    {ranOff.length > 0 && (
+                      <div className="absolute inset-x-0" style={{ bottom: 20 }}>
+                        <div style={{ height: 1, background: 'repeating-linear-gradient(90deg,#4A4D4E 0 5px,transparent 5px 10px)' }} />
+                      </div>
+                    )}
                   </div>
-                  <p className="label mt-3">{agarose}% {t('gel.agarose')} · {topology}</p>
+
+                  <div className="flex justify-between gap-4 mt-3">
+                    <span className="label">{t('gel.ladder')}</span>
+                    <span className="label">{agarose}% {t('gel.agarose')} · {topology}</span>
+                  </div>
+
+                  {(ranOff.length > 0 || stuck.length > 0) && (
+                    <div className="mt-4">
+                      <Notice>
+                        {ranOff.length > 0 && (
+                          <span className="block">
+                            {t('gel.ranoff')} — <span className="num">{ranOff.map(f => f.length).join(', ')} bp</span>
+                            {' '}&lt; {formatNumber(minBp)} bp
+                          </span>
+                        )}
+                        {stuck.length > 0 && (
+                          <span className="block mt-1">
+                            {t('gel.stuck')} — <span className="num">{stuck.map(f => f.length).join(', ')} bp</span>
+                            {' '}&gt; {formatNumber(maxBp)} bp
+                          </span>
+                        )}
+                        <span className="block mt-1.5 text-muted">{t('gel.rangehint')}</span>
+                      </Notice>
+                    </div>
+                  )}
                 </Panel>
 
                 <Panel title={t('gel.fragments')}>
-                  <div className="scroll-thin overflow-auto" style={{ maxHeight: GEL_HEIGHT }}>
+                  <div className="scroll-thin overflow-auto">
                     <table className="w-full text-[13px]">
                       <thead className="sticky top-0 bg-bg2">
                         <tr className="border-b border-line">

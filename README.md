@@ -19,7 +19,7 @@ The project is deliberately not a plain landing page. It is built as what real b
 
 | | Функционалност | Feature |
 |---|---|---|
-| 🧬 | Пет алатки за анализа на секвенци што работат локално во прелистувач | Five sequence-analysis tools running locally in the browser |
+| 🧬 | Две алатки за анализа на секвенци што работат локално во прелистувач | Two sequence-analysis tools running locally in the browser |
 | 📅 | Систем за резервација на инструменти со детекција на преклопување | Instrument booking system with overlap detection |
 | 🔐 | Автентикација со JWT и улоги (`admin`, `researcher`) | JWT authentication with roles |
 | 🗂️ | Администрација со CRUD за публикации, вести и луѓе | Administration with CRUD for publications, news and people |
@@ -66,9 +66,9 @@ npm run dev:client    # Vite на :5173, со proxy кон :4000
 npm test
 ```
 
-24 теста ја покриваат целата алгоритамска библиотека — порамнување, транслација, рестрикциска дигестија и филогенетика — со очекувани вредности земени од учебничките примери.
+14 теста ја покриваат целата алгоритамска библиотека — парсирање FASTA, транслација, наоѓање отворени рамки на читање и рестрикциска дигестија — со очекувани вредности проверливи наспрема која било референтна имплементација.
 
-24 tests cover the whole algorithm library — alignment, translation, restriction digest and phylogenetics — with expected values taken from the standard textbook examples.
+14 tests cover the whole algorithm library — FASTA parsing, translation, open-reading-frame detection and restriction digestion — with expected values checkable against any reference implementation.
 
 ---
 
@@ -93,19 +93,18 @@ All computation happens in the browser — not one byte of an entered sequence i
 | Алатка / Tool | Алгоритми / Algorithms |
 |---|---|
 | **Секвенцна работилница** / Sequence Toolkit | Комплемент, транскрипција, транслација во 6 рамки, наоѓање ORF, GC содржина, Tm (Wallace / GC-формула), молекуларна маса |
-| **Визуелизатор на порамнување** / Alignment Visualiser | Needleman–Wunsch (глобално), Smith–Waterman (локално), BLOSUM62; целосна матрица на динамичко програмирање со анимирано пополнување по антидијагонали и осветлено враќање наназад |
-| **Виртуелна електрофореза** / Virtual Electrophoresis | 20 рестрикциски ензими со IUPAC препознавање, дигестија на линеарна и кружна ДНК, симулиран агарозен гел (0.7–2.0 %) со логаритамска миграција |
-| **Филогенетско дрво** / Phylogenetic Tree | p-растојание и Jukes–Cantor корекција, UPGMA, Neighbour-Joining, извоз во Newick |
-| **Композициска анализа** / Composition Analysis | k-мер спектар (k = 1…6), кодонска употреба по аминокиселина, GC асиметрија, Kyte–Doolittle профил на хидрофобност |
+| **Виртуелна електрофореза** / Virtual Electrophoresis | 20 рестрикциски ензими со IUPAC препознавање, дигестија на линеарна и кружна ДНК, симулиран агарозен гел (0.7–2.0 %) со логаритамска миграција и експлицитно означување на фрагментите што излегуваат од опсегот на гелот |
 
 ### Проверливост / Verifiability
 
 Резултатите се споредливи со референтни имплементации:
 
-* `GCATGCG` / `GATTACA`, match +1, mismatch −1, gap −1 → **NW резултат 0**
-* `GGTTGACTA` / `TGTTACGG`, match +3, mismatch −3, gap −2 → **SW резултат 13**, порамнување `GTTGAC` / `GTT-AC`
-* `HEAGAWGHEE` / `PAWHEAE`, BLOSUM62, gap −8 → **SW резултат 20**, порамнување `AWGHE` / `AW-HE`
-* Кодирачкиот регион на човечкиот β-глобин → протеин што почнува со `MVHLTPEEK`, 147 аминокиселини
+Results are checkable against reference implementations:
+
+* Кодирачкиот регион на човечкиот β-глобин → протеин што почнува со `MVHLTPEEK`, 147 аминокиселини плус стоп кодон
+* `EcoRI` (`G^AATTC`) во демо-конструктот → точно две места на сечење, на позиции 1 и 46
+* Дигестија со повеќе ензими → збирот на должините на фрагментите е секогаш еднаков на должината на влезната секвенца
+* `meltingTemp('GCGCGCGCGCGCGCGCGCGC')` → 72.28 °C по GC-формулата
 
 ---
 
@@ -127,17 +126,15 @@ genomika-lab/
 │           └── admin.js     CRUD зад улога `admin`
 │
 └── client/                  React 18 + TypeScript + Vite + Tailwind v4
-    ├── tests/bio.test.ts    24 теста за алгоритамската библиотека
+    ├── tests/bio.test.ts    14 теста за алгоритамската библиотека
     └── src/
         ├── lib/bio/         ★ Алгоритамска библиотека — без надворешни зависности
-        │   ├── sequence.ts    Секвенцни операции, кодонска табела, ORF, k-мери
-        │   ├── align.ts       Динамичко програмирање + BLOSUM62
+        │   ├── sequence.ts    Секвенцни операции, кодонска табела, ORF
         │   ├── enzymes.ts     Рестрикциски ензими, дигестија, миграција на гел
-        │   ├── phylo.ts       Растојанија, UPGMA, Neighbour-Joining, Newick
-        │   └── samples.ts     Примероци за секоја алатка
+        │   └── samples.ts     Примероци за двете алатки
         ├── i18n/dict.ts     385 двојазични записи во една рамна табела
         ├── components/      Дизајн систем, графикони, мрежен граф, приказ на секвенци
-        └── pages/           17 страници
+        └── pages/           16 страници
 ```
 
 ### Технички одлуки / Technical decisions
