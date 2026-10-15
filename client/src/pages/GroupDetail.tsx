@@ -94,7 +94,7 @@ export default function GroupDetail() {
                   <Card hover className="p-3.5 flex items-center gap-3.5">
                     <span
                       className="w-9 h-9 rounded-full shrink-0 grid place-items-center num text-[11px]"
-                      style={{ background: `oklch(0.55 0.13 ${person.hue})`, color: '#0A0D0C' }}
+                      style={{ background: `oklch(0.88 0.045 ${person.hue})`, color: 'var(--ink)' }}
                       aria-hidden="true"
                     >
                       {f(person, 'name').replace(/^(проф\.|д-р|Prof\.|Dr\.)\s*/i, '').split(' ').map(w => w[0]).slice(0, 2).join('')}

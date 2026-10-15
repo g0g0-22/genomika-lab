@@ -26,8 +26,8 @@ export function Avatar({ person, size = 46 }: { person: Person; size?: number })
       className="rounded-full shrink-0 grid place-items-center num font-semibold"
       style={{
         width: size, height: size,
-        background: `oklch(0.58 0.14 ${person.hue})`,
-        color: '#08100C',
+        background: `oklch(0.88 0.045 ${person.hue})`,
+        color: 'var(--ink)',
         fontSize: size * 0.32
       }}
       aria-hidden="true"

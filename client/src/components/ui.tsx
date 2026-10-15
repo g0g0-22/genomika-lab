@@ -2,26 +2,33 @@ import { type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLang } from '../i18n';
 
-/* ------------------------------------------------------------ PRIMITIVES */
+/* ----------------------------------------------------------- PRIMITIVES */
 
-export function Label({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <span className={`label ${className}`}>{children}</span>;
+export function Label({ children, className = '', dot = false }: {
+  children: ReactNode; className?: string; dot?: boolean;
+}) {
+  return <span className={`label ${dot ? 'label-dot' : ''} ${className}`}>{children}</span>;
 }
 
 export function Stat({ value, label, accent }: { value: ReactNode; label: string; accent?: string }) {
   return (
     <div>
-      <div className="num text-3xl md:text-4xl leading-none" style={accent ? { color: accent } : undefined}>{value}</div>
-      <div className="label mt-2">{label}</div>
+      <div className="font-display text-[clamp(1.9rem,3.4vw,2.9rem)] leading-none tracking-[-.03em]"
+           style={accent ? { color: accent } : undefined}>
+        {value}
+      </div>
+      <div className="label mt-3">{label}</div>
     </div>
   );
 }
 
 /**
- * The decorative nucleotide strip. It is derived from a string so the same
- * heading always produces the same pattern — a small deterministic signature.
+ * A row of nucleotide ticks, derived deterministically from a string. Kept
+ * hairline-thin: it marks a section, it does not decorate it.
  */
-export function DnaStrip({ seed = 'genomika', count = 48, className = '' }: { seed?: string; count?: number; className?: string }) {
+export function DnaStrip({ seed = 'genomika', count = 48, className = '' }: {
+  seed?: string; count?: number; className?: string;
+}) {
   const bases = ['A', 'C', 'G', 'T'];
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
@@ -30,46 +37,70 @@ export function DnaStrip({ seed = 'genomika', count = 48, className = '' }: { se
     return bases[(hash >>> (i % 8)) % 4];
   });
   return (
-    <div className={`flex gap-[2px] h-1.5 overflow-hidden ${className}`} aria-hidden="true">
+    <div className={`flex gap-[3px] h-[3px] overflow-hidden ${className}`} aria-hidden="true">
       {cells.map((b, i) => (
-        <span key={i} className={`flex-1 nt-${b}`} style={{ background: 'currentColor', opacity: 0.55 }} />
+        <span key={i} className={`flex-1 nt-${b}`} style={{ background: 'currentColor', opacity: 0.4 }} />
       ))}
     </div>
   );
 }
 
-export function PageHeader({ index, title, lead, children }: { index: string; title: string; lead?: string; children?: ReactNode }) {
+/* -------------------------------------------------------------- HEADERS */
+
+/**
+ * Page masthead. The index numeral sits in the left margin and the lead sits
+ * in its own column, the way a printed report sets an opening spread.
+ */
+export function PageHeader({ index, title, lead, children }: {
+  index: string; title: string; lead?: string; children?: ReactNode;
+}) {
+  const folio = index.split('/')[0].trim();
   return (
-    <header className="border-b border-line pb-10 mb-12">
-      <div className="flex items-baseline gap-4 rise">
-        <span className="num text-accent text-xs">{index}</span>
-        <DnaStrip seed={title} count={28} className="w-24 opacity-60" />
+    <header className="mb-20 md:mb-28">
+      <div className="grid gap-y-8 md:grid-cols-12 md:gap-x-10 items-end">
+        <div className="md:col-span-8">
+          <span className="folio block rise text-muted">{folio}</span>
+          <h1 className="mt-5 text-[clamp(2.4rem,6.5vw,5.1rem)] rise" style={{ animationDelay: '60ms' }}>
+            {title}
+          </h1>
+        </div>
+        {lead && (
+          <div className="md:col-span-4 md:pb-3">
+            <p className="text-[14px] leading-[1.65] text-ink2 rise" style={{ animationDelay: '130ms' }}>
+              {lead}
+            </p>
+          </div>
+        )}
       </div>
-      <h1 className="mt-5 text-4xl md:text-6xl rise" style={{ animationDelay: '60ms' }}>{title}</h1>
-      {lead && (
-        <p className="mt-5 max-w-2xl text-[15px] leading-relaxed text-ink2 rise" style={{ animationDelay: '120ms' }}>
-          {lead}
-        </p>
+      {children && (
+        <div className="mt-12 pt-7 border-t border-line rise" style={{ animationDelay: '190ms' }}>
+          {children}
+        </div>
       )}
-      {children && <div className="mt-7 rise" style={{ animationDelay: '180ms' }}>{children}</div>}
     </header>
   );
 }
 
-export function SectionHeading({ index, title, sub, right }: { index?: string; title: string; sub?: string; right?: ReactNode }) {
+export function SectionHeading({ index, title, sub, right }: {
+  index?: string; title: string; sub?: string; right?: ReactNode;
+}) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
-      <div>
-        <div className="flex items-center gap-3">
-          {index && <span className="num text-[11px] text-accent">{index}</span>}
-          <h2 className="text-2xl md:text-[28px]">{title}</h2>
+    <div className="pt-7 border-t border-line mb-10">
+      <div className="grid gap-y-5 md:grid-cols-12 md:gap-x-10 items-start">
+        {index && <span className="folio text-muted md:col-span-1">{index}</span>}
+        <div className={index ? 'md:col-span-6' : 'md:col-span-7'}>
+          <h2 className="text-[clamp(1.5rem,2.6vw,2.2rem)]">{title}</h2>
         </div>
-        {sub && <p className="mt-2 text-sm text-muted max-w-xl">{sub}</p>}
+        <div className="md:col-span-4 md:col-start-9 flex items-start justify-between gap-5">
+          {sub && <p className="text-[13.5px] leading-relaxed text-ink2 max-w-sm">{sub}</p>}
+          {right && <div className="shrink-0 ml-auto">{right}</div>}
+        </div>
       </div>
-      {right}
     </div>
   );
 }
+
+/* ------------------------------------------------------------- SURFACES */
 
 export function Card({ children, className = '', hover = false, as: As = 'div', style }: {
   children: ReactNode; className?: string; hover?: boolean; as?: any; style?: CSSProperties;
@@ -77,13 +108,13 @@ export function Card({ children, className = '', hover = false, as: As = 'div', 
   return <As className={`card ${hover ? 'card-hover' : ''} ${className}`} style={style}>{children}</As>;
 }
 
-/* ------------------------------------------------------------ FEEDBACK -- */
+/* ------------------------------------------------------------- FEEDBACK */
 
 export function Loading({ label }: { label?: string }) {
   const { t } = useLang();
   return (
-    <div className="flex items-center gap-3 py-16 text-muted fade" role="status" aria-live="polite">
-      <span className="live-dot inline-block w-2 h-2 rounded-full bg-accent" />
+    <div className="flex items-center gap-3 py-20 text-muted fade" role="status" aria-live="polite">
+      <span className="live-dot inline-block w-1.5 h-1.5 rounded-full bg-ink" />
       <span className="label">{label ?? t('common.loading')}</span>
     </div>
   );
@@ -92,9 +123,9 @@ export function Loading({ label }: { label?: string }) {
 export function ErrorBox({ onRetry }: { onRetry?: () => void }) {
   const { t } = useLang();
   return (
-    <div className="card p-6 my-8 border-danger/40" role="alert">
-      <p className="text-sm text-danger">{t('common.error')}</p>
-      {onRetry && <button className="btn btn-sm mt-4" onClick={onRetry}>{t('common.retry')}</button>}
+    <div className="card p-7 my-10" role="alert">
+      <p className="text-[14px] text-danger">{t('common.error')}</p>
+      {onRetry && <button className="btn btn-sm mt-5" onClick={onRetry}>{t('common.retry')}</button>}
     </div>
   );
 }
@@ -102,27 +133,26 @@ export function ErrorBox({ onRetry }: { onRetry?: () => void }) {
 export function Empty({ label }: { label?: string }) {
   const { t } = useLang();
   return (
-    <div className="py-14 text-center">
-      <DnaStrip seed="empty" count={16} className="w-24 mx-auto opacity-30" />
-      <p className="label mt-4">{label ?? t('common.empty')}</p>
+    <div className="py-20 text-center border-t border-line">
+      <p className="label">{label ?? t('common.empty')}</p>
     </div>
   );
 }
 
-/* --------------------------------------------------------------- FORMS -- */
+/* ---------------------------------------------------------------- FORMS */
 
 export function Field({ label, hint, error, children, required }: {
   label: string; hint?: string; error?: string; children: ReactNode; required?: boolean;
 }) {
   return (
     <label className="block">
-      <span className="label block mb-2">
+      <span className="label block mb-2.5">
         {label}
-        {required && <span className="text-accent ml-1">*</span>}
+        {required && <span className="ml-1">*</span>}
       </span>
       {children}
-      {hint && !error && <span className="block mt-1.5 text-[11px] text-muted">{hint}</span>}
-      {error && <span className="block mt-1.5 text-[11px] text-danger">{error}</span>}
+      {hint && !error && <span className="block mt-2 text-[11.5px] text-muted">{hint}</span>}
+      {error && <span className="block mt-2 text-[11.5px] text-danger">{error}</span>}
     </label>
   );
 }
@@ -134,16 +164,14 @@ export function Toggle({ options, value, onChange, ariaLabel }: {
   ariaLabel?: string;
 }) {
   return (
-    <div className="inline-flex border border-line rounded-xs overflow-hidden" role="group" aria-label={ariaLabel}>
+    <div className="inline-flex gap-1.5" role="group" aria-label={ariaLabel}>
       {options.map(o => (
         <button
           key={o.value}
           type="button"
           onClick={() => onChange(o.value)}
           aria-pressed={value === o.value}
-          className={`px-3 py-1.5 font-mono text-[10px] uppercase tracking-[.1em] transition-colors ${
-            value === o.value ? 'bg-accent text-bg font-semibold' : 'text-muted hover:text-ink'
-          }`}
+          className={`chip ${value === o.value ? 'chip-on' : ''}`}
         >
           {o.label}
         </button>
@@ -153,25 +181,26 @@ export function Toggle({ options, value, onChange, ariaLabel }: {
 }
 
 export function Notice({ kind = 'info', children }: { kind?: 'info' | 'ok' | 'error'; children: ReactNode }) {
-  const border = kind === 'error' ? 'border-danger/50' : kind === 'ok' ? 'border-accent/50' : 'border-line';
-  const text = kind === 'error' ? 'text-danger' : kind === 'ok' ? 'text-accent' : 'text-ink2';
+  const tone = kind === 'error' ? 'text-danger' : kind === 'ok' ? 'text-accent' : 'text-ink2';
   return (
-    <div className={`card ${border} p-4 text-sm ${text}`} role={kind === 'error' ? 'alert' : 'status'}>
+    <div className={`border-l-2 pl-5 py-1 text-[14px] ${tone}`}
+         style={{ borderColor: kind === 'error' ? 'var(--danger)' : kind === 'ok' ? 'var(--accent)' : 'var(--line-firm)' }}
+         role={kind === 'error' ? 'alert' : 'status'}>
       {children}
     </div>
   );
 }
 
-/* ---------------------------------------------------------- NAVIGATION -- */
+/* ----------------------------------------------------------- NAVIGATION */
 
 export function ArrowLink({ to, children, external = false }: { to: string; children: ReactNode; external?: boolean }) {
   const inner = (
     <>
       <span className="link-underline">{children}</span>
-      <span aria-hidden="true" className="transition-transform group-hover:translate-x-1 inline-block">→</span>
+      <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5 inline-block">→</span>
     </>
   );
-  const cls = 'group inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[.1em] text-accent';
+  const cls = 'group inline-flex items-center gap-2 text-[13px] text-ink hover:text-accent transition-colors';
   return external
     ? <a className={cls} href={to} target="_blank" rel="noopener noreferrer">{inner}</a>
     : <Link className={cls} to={to}>{inner}</Link>;
@@ -179,13 +208,13 @@ export function ArrowLink({ to, children, external = false }: { to: string; chil
 
 export function Crumb({ to, label }: { to: string; label: string }) {
   return (
-    <Link to={to} className="label hover:text-accent inline-flex items-center gap-2">
+    <Link to={to} className="label hover:text-ink inline-flex items-center gap-2 transition-colors">
       <span aria-hidden="true">←</span> {label}
     </Link>
   );
 }
 
-/* ------------------------------------------------------------- HELPERS -- */
+/* ---------------------------------------------------------------- UTILS */
 
 /** Maps a group's accent key onto its validated categorical series colour. */
 export const accentVar = (accent?: string) =>

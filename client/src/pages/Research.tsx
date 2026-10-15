@@ -29,29 +29,33 @@ export default function Research() {
     <>
       <PageHeader index="01 / RESEARCH" title={t('research.title')} lead={t('research.lead')} />
 
-      <section className="mb-16">
-        <div className="grid gap-5 lg:grid-cols-3">
+      <section className="mb-24">
+        <div className="grid md:grid-cols-3">
           {groups.data?.map((group, i) => (
-            <Link key={group.id} to={`/research/${group.slug}`} className="rise block" style={{ animationDelay: `${i * 90}ms` }}>
-              <Card hover className="p-6 h-full flex flex-col">
-                <span className="block h-[3px] w-14 rounded-full mb-5" style={{ background: accentVar(group.accent) }} />
-                <Label>{t('research.founded')} {group.founded}</Label>
-                <h2 className="mt-2 text-2xl leading-snug">{f(group, 'name')}</h2>
-                <p className="mt-2 text-[13px] italic text-muted">{f(group, 'tagline')}</p>
-                <p className="mt-4 text-[13px] leading-relaxed text-ink2 flex-1">{f(group, 'description')}</p>
-                <div className="mt-6 flex gap-2">
-                  <span className="chip">{group.member_count} {t('research.members').toLowerCase()}</span>
-                  <span className="chip">{group.publication_count} {t('pub.title').toLowerCase()}</span>
-                </div>
-              </Card>
+            <Link
+              key={group.id}
+              to={`/research/${group.slug}`}
+              className="group block border-t border-line md:border-t-0 md:border-l first:md:border-l-0 py-9 md:py-0 md:px-8 first:md:pl-0 last:md:pr-0 rise"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
+              <span className="block h-[2px] w-9" style={{ background: accentVar(group.accent) }} />
+              <span className="label block mt-6">{t('research.founded')} {group.founded}</span>
+              <h2 className="mt-3 text-[1.45rem] leading-[1.15] group-hover:text-accent transition-colors">
+                {f(group, 'name')}
+              </h2>
+              <p className="mt-3 text-[13.5px] italic text-muted">{f(group, 'tagline')}</p>
+              <p className="mt-5 text-[13.5px] leading-relaxed text-ink2">{f(group, 'description')}</p>
+              <p className="mt-7 label">
+                {group.member_count} {t('research.members').toLowerCase()} · {group.publication_count} {t('pub.title').toLowerCase()}
+              </p>
             </Link>
           ))}
         </div>
       </section>
 
       <section>
-        <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
-          <h2 className="text-2xl">{t('research.projects')}</h2>
+        <div className="pt-8 border-t border-line mb-10 flex flex-wrap items-baseline justify-between gap-5">
+          <h2 className="text-[clamp(1.5rem,2.6vw,2.1rem)]">{t('research.projects')}</h2>
           <Toggle
             ariaLabel={t('common.status')}
             value={status}
@@ -69,9 +73,9 @@ export default function Research() {
         {projects.error && <ErrorBox onRetry={projects.reload} />}
         {projects.data?.length === 0 && <Empty />}
 
-        <div className="space-y-4">
+        <div>
           {projects.data?.map((project, i) => (
-            <Card key={project.id} hover className="p-6 rise" style={{ animationDelay: `${i * 60}ms` }}>
+            <div key={project.id} className="border-t border-line py-9 rise" style={{ animationDelay: `${i * 60}ms` }}>
               <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_260px]">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -111,10 +115,9 @@ export default function Research() {
                       {formatDate(project.end_date, { month: 'short', year: 'numeric' })}
                     </dd>
                   </div>
-                  <DnaStrip seed={project.slug} count={22} className="opacity-40" />
                 </dl>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       </section>

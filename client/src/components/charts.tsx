@@ -152,7 +152,7 @@ export function LineChart({ data, height = 180, valueSuffix = '', color = 'var(-
           <circle
             key={d.label + i}
             cx={x(i)} cy={y(d.value)} r={active === i ? 5 : 3}
-            fill={color} stroke="var(--bg-2)" strokeWidth="2"
+            fill={color} stroke="var(--paper)" strokeWidth="2"
           />
         ))}
 

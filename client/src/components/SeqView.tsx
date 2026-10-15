@@ -27,7 +27,7 @@ export function SeqView({ seq, kind = 'nucleotide', lineLength = 60, maxHeight =
 
   const paint = (ch: string, index: number) => {
     const marked = highlight && index >= highlight[0] && index <= highlight[1];
-    const style = marked ? { background: 'var(--glow)', outline: '1px solid var(--accent)' } : undefined;
+    const style = marked ? { background: 'var(--accent-soft)', outline: '1px solid var(--accent)' } : undefined;
     if (kind === 'plain') return <span key={index} style={style}>{ch}</span>;
     if (kind === 'protein') {
       return <span key={index} style={{ color: AA_COLOR[AA_CLASS[ch] ?? 'special'], ...style }}>{ch}</span>;

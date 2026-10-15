@@ -175,14 +175,14 @@ export function NetworkGraph({ nodes, links, height = 520 }: {
               <circle
                 r={radiusOf(node)}
                 fill={colorOf(node)}
-                stroke="var(--bg-2)"
+                stroke="var(--paper)"
                 strokeWidth="2"
               />
               {(node.kind !== 'person' || selected === node.id || node.seniority === 'faculty') && (
                 <text
                   x={radiusOf(node) + 6} y={4}
                   fontSize={node.kind === 'group' ? 12 : 10}
-                  fill={node.kind === 'group' ? 'var(--ink)' : 'var(--ink2)'}
+                  fill={node.kind === 'group' ? 'var(--ink)' : 'var(--ink-2)'}
                   className="font-mono pointer-events-none"
                 >
                   {f(node, 'label').length > 32 ? `${f(node, 'label').slice(0, 30)}…` : f(node, 'label')}
@@ -275,7 +275,7 @@ export function PartnerMap({ partners, height = 420 }: { partners: Partner[]; he
                 cx={x(partner.lng)} cy={y(partner.lat)} r={radius}
                 fill={isHome ? 'var(--accent)' : 'var(--s-blue)'}
                 fillOpacity={hover === null || hover === partner.id ? 0.85 : 0.3}
-                stroke="var(--bg-2)" strokeWidth="1.5"
+                stroke="var(--paper)" strokeWidth="1.5"
               />
               {(isHome || hover === partner.id) && (
                 <text

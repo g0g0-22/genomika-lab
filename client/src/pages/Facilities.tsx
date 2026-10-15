@@ -124,7 +124,7 @@ export default function Facilities() {
                       <Card
                         hover
                         className="p-3.5"
-                        style={slug === item.slug ? { borderColor: 'var(--accent)', background: 'var(--bg-3)' } : undefined}
+                        style={slug === item.slug ? { borderColor: 'var(--accent)', background: 'var(--ground)' } : undefined}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <span className="text-[13px] leading-snug">{f(item, 'name')}</span>
@@ -218,7 +218,7 @@ export default function Facilities() {
                         }`}
                       >
                         <span className="num text-[12px] block">{pad(slot.hour)}</span>
-                        <span className="label block mt-1 !text-[8.5px]" style={selected ? { color: 'var(--bg)' } : undefined}>
+                        <span className="label block mt-1 !text-[8.5px]" style={selected ? { color: 'var(--paper)' } : undefined}>
                           {slot.free ? t('fac.freeslot') : t('fac.taken')}
                         </span>
                       </button>

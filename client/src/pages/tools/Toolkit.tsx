@@ -12,7 +12,7 @@ import {
 import { HBB_CDS } from '../../lib/bio/samples';
 
 const NT_COLOR: Record<string, string> = {
-  A: '#35C77A', C: '#4C9BF5', G: '#E0A02F', T: '#E8605D', U: '#E8605D', N: 'var(--muted)'
+  A: '#3F7D5A', C: '#3C6490', G: '#9A7430', T: '#A24B46', U: '#A24B46', N: 'var(--muted)'
 };
 
 export default function Toolkit() {

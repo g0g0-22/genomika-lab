@@ -5,10 +5,7 @@ import type { DictKey } from '../i18n/dict';
 
 const TOOLS: { to: string; name: DictKey; desc: DictKey; glyph: string; tags: string[] }[] = [
   { to: '/tools/toolkit',     name: 'tool.toolkit.name', desc: 'tool.toolkit.desc', glyph: 'ATG', tags: ['ORF', 'GC%', 'Tm', 'translate'] },
-  { to: '/tools/alignment',   name: 'tool.align.name',   desc: 'tool.align.desc',   glyph: '⇄',   tags: ['Needleman–Wunsch', 'Smith–Waterman', 'BLOSUM62'] },
-  { to: '/tools/gel',         name: 'tool.gel.name',     desc: 'tool.gel.desc',     glyph: '≡',   tags: ['EcoRI', 'BamHI', '+18 more'] },
-  { to: '/tools/phylogeny',   name: 'tool.phylo.name',   desc: 'tool.phylo.desc',   glyph: '⋔',   tags: ['UPGMA', 'Neighbour-Joining', 'Newick'] },
-  { to: '/tools/composition', name: 'tool.comp.name',    desc: 'tool.comp.desc',    glyph: '∑',   tags: ['k-mer', 'codon usage', 'Kyte–Doolittle'] }
+  { to: '/tools/gel',         name: 'tool.gel.name',     desc: 'tool.gel.desc',     glyph: '≡',   tags: ['EcoRI', 'BamHI', '+18 more'] }
 ];
 
 export default function ToolsHub() {
