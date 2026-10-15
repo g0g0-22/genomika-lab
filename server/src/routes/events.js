@@ -13,8 +13,10 @@ events.get('/events', (req, res) => {
   let sql = 'SELECT * FROM events WHERE 1=1';
   const params = [];
   if (kind) { sql += ' AND kind = ?'; params.push(kind); }
-  if (scope === 'upcoming') sql += " AND starts_at >= datetime('now')";
-  if (scope === 'past') sql += " AND starts_at < datetime('now')";
+  // Both sides go through datetime() so a stored UTC instant and SQLite's own
+  // UTC clock are compared as times, not as strings in two different shapes.
+  if (scope === 'upcoming') sql += " AND datetime(starts_at) >= datetime('now')";
+  if (scope === 'past') sql += " AND datetime(starts_at) < datetime('now')";
   const dir = scope === 'past' ? 'DESC' : 'ASC';
   res.json(db.prepare(`${sql} ORDER BY starts_at ${dir}`).all(...params).map(withCounts));
 });
@@ -50,6 +52,8 @@ events.post('/events/:id/rsvp', (req, res) => {
 events.get('/events/:id/ics', (req, res) => {
   const e = db.prepare('SELECT * FROM events WHERE id = ?').get(req.params.id);
   if (!e) return res.status(404).json({ error: 'not_found' });
+  // Stored values already carry a Z, so stripping separators yields the
+  // UTC form iCalendar expects: 20261021T120000Z.
   const stamp = (s) => s.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const escape = (s) => String(s || '').replace(/([,;\\])/g, '\\$1').replace(/\n/g, '\\n');
   const ics = [

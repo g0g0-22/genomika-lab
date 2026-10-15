@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useLang } from '../../i18n';
 import { ToolShell, Panel, Metric } from '../../components/ToolShell';
 import { SequenceInput } from '../../components/SequenceInput';
+import { useDebounced } from '../../lib/useDebounced';
 import { Toggle, Notice, download } from '../../components/ui';
 import {
   ENZYMES, findCutSites, digest, recognitionSequence, migration,
@@ -16,14 +17,16 @@ const LANE_WIDTH = 74;
 export default function Gel() {
   const { t, formatNumber } = useLang();
   const [raw, setRaw] = useState('');
+  // Derived views are recomputed from this, not from every keystroke.
+  const input = useDebounced(raw);
   const [selected, setSelected] = useState<string[]>(['EcoRI', 'BamHI', 'HindIII']);
   const [agarose, setAgarose] = useState('1.0');
   const [topology, setTopology] = useState('linear');
   const [runId, setRunId] = useState(0);
 
   const seq = useMemo(
-    () => cleanSequence(parseFasta(raw).map(r => r.seq).join('')).seq,
-    [raw]
+    () => cleanSequence(parseFasta(input).map(r => r.seq).join('')).seq,
+    [input]
   );
 
   const enzymes = useMemo(

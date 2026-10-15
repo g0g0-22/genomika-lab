@@ -296,12 +296,16 @@ const nStmt = ins(`INSERT INTO news (slug,title_mk,title_en,excerpt_mk,excerpt_e
 news.forEach(n => nStmt.run(n));
 
 /* ---------------------------------------------------------------- EVENTS */
+/**
+ * `hour` is the intended local wall-clock time of the event; the value stored
+ * is the equivalent instant in UTC, marked with a Z. Storing a bare local
+ * string made it incomparable with SQLite's datetime('now'), which is UTC.
+ */
 function futureDate(offsetDays, hour) {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
   d.setHours(hour, 0, 0, 0);
-  const pad = (x) => String(x).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:00:00`;
+  return `${d.toISOString().slice(0, 19)}Z`;
 }
 const events = [
   { off:6, h:14, dur:1, kind:'seminar', capacity:60, location:'Амфитеатар А / Lecture Hall A', speaker:'Prof. Marit Andersen', affiliation:'University of Oslo',

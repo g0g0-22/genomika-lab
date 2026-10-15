@@ -1,4 +1,14 @@
 import { formatBlocks, AA_CLASS } from '../lib/bio/sequence';
+import { useLang } from '../i18n';
+
+function TruncationNotice({ shown, total }: { shown: number; total: number }) {
+  const { t, formatNumber } = useLang();
+  return (
+    <p className="label mb-3 pb-2 border-b border-line">
+      {t('seq.truncated')} — {formatNumber(shown)} / {formatNumber(total)}
+    </p>
+  );
+}
 
 const AA_COLOR: Record<string, string> = {
   hydrophobic: 'var(--s-rose)',
@@ -13,6 +23,14 @@ const AA_COLOR: Record<string, string> = {
  * by amino-acid class. Long sequences scroll inside their own pane rather than
  * stretching the page.
  */
+/**
+ * Every residue becomes its own <span> so it can be coloured, which puts a
+ * hard ceiling on how much can be drawn: the file picker accepts two million
+ * characters, and rendering that many nodes would hang the tab. Past the cap
+ * the view shows the opening stretch and says so.
+ */
+const MAX_RENDERED = 20_000;
+
 export function SeqView({ seq, kind = 'nucleotide', lineLength = 60, maxHeight = 260, highlight }: {
   seq: string;
   kind?: 'nucleotide' | 'protein' | 'plain';
@@ -22,7 +40,9 @@ export function SeqView({ seq, kind = 'nucleotide', lineLength = 60, maxHeight =
   highlight?: [number, number];
 }) {
   if (!seq) return null;
-  const lines = formatBlocks(seq, lineLength, 10);
+  const truncated = seq.length > MAX_RENDERED;
+  const shown = truncated ? seq.slice(0, MAX_RENDERED) : seq;
+  const lines = formatBlocks(shown, lineLength, 10);
   const width = String(seq.length).length;
 
   const paint = (ch: string, index: number) => {
@@ -38,6 +58,7 @@ export function SeqView({ seq, kind = 'nucleotide', lineLength = 60, maxHeight =
   let position = 0;
   return (
     <div className="seq scroll-thin overflow-auto card p-3.5" style={{ maxHeight }}>
+      {truncated && <TruncationNotice shown={MAX_RENDERED} total={seq.length} />}
       {lines.map(line => (
         <div key={line.start} className="flex gap-3 whitespace-pre">
           <span className="text-muted select-none shrink-0 opacity-60" style={{ minWidth: `${width}ch` }}>

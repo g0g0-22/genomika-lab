@@ -166,6 +166,7 @@ export const dict = {
   'seq.orf.end':       ['Крај', 'End'],
   'seq.orf.aa':        ['АК', 'aa'],
   'seq.invalid':       ['Непознатите знаци беа игнорирани', 'Unknown characters were ignored'],
+  'seq.truncated':     ['Прикажан е само почетниот дел од секвенцата', 'Only the opening stretch of the sequence is shown'],
   'seq.empty':         ['Внесете секвенца за да започнете.', 'Enter a sequence to begin.'],
   'seq.stopcodon':     ['стоп кодон', 'stop codon'],
 

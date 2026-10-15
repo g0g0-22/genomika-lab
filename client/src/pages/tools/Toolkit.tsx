@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { useLang } from '../../i18n';
 import { ToolShell, Panel, Metric } from '../../components/ToolShell';
 import { SequenceInput } from '../../components/SequenceInput';
+import { useDebounced } from '../../lib/useDebounced';
 import { SeqView } from '../../components/SeqView';
 import { Toggle, CopyButton, download, Empty } from '../../components/ui';
 import {
@@ -18,16 +19,18 @@ const NT_COLOR: Record<string, string> = {
 export default function Toolkit() {
   const { t, lang, formatNumber } = useLang();
   const [raw, setRaw] = useState('');
+  // Derived views are recomputed from this, not from every keystroke.
+  const input = useDebounced(raw);
   const [tab, setTab] = useState('transform');
   const [minAa, setMinAa] = useState(30);
   const [openOrf, setOpenOrf] = useState<number | null>(null);
 
   const { seq, dropped, id } = useMemo(() => {
-    const records = parseFasta(raw);
+    const records = parseFasta(input);
     const joined = records.map(r => r.seq).join('');
     const cleaned = cleanSequence(joined);
     return { seq: cleaned.seq, dropped: cleaned.dropped, id: records[0]?.id ?? 'sequence' };
-  }, [raw]);
+  }, [input]);
 
   const kind = detectKind(seq);
   const counts = useMemo(() => baseCounts(seq), [seq]);

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLang } from '../../i18n';
 import { useAuth } from '../../lib/auth';
 import { useFetch } from '../../lib/useFetch';
-import { post, put, del } from '../../lib/api';
+import { post, put, del, ApiError } from '../../lib/api';
 import { PageHeader, Card, Label, Loading, ErrorBox, Empty, Toggle, Field, Notice, Stat } from '../../components/ui';
 
 type Overview = {
@@ -19,6 +19,42 @@ type NewsRow = { id: number; slug: string; date: string; tag: string; title_mk: 
 type PersonRow = { id: number; slug: string; name_mk: string; name_en: string; role_mk: string; role_en: string; seniority: string; email: string; joined_year: number };
 
 const TABS = ['overview', 'publications', 'news', 'people', 'inbox'] as const;
+
+/**
+ * Every administrative write goes through here. Previously they were bare
+ * `await`s inside onClick handlers: a rejected request left the handler before
+ * its state updates ran, so a failed save looked exactly like nothing
+ * happening at all.
+ */
+function useMutation(onSettled?: () => void) {
+  const { t } = useLang();
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!notice) return;
+    const id = setTimeout(() => setNotice(null), 4000);
+    return () => clearTimeout(id);
+  }, [notice]);
+
+  const run = async (action: () => Promise<unknown>, successText: string) => {
+    setBusy(true);
+    try {
+      await action();
+      setNotice({ kind: 'ok', text: successText });
+      onSettled?.();
+      return true;
+    } catch (err) {
+      const code = err instanceof ApiError ? err.code : 'unknown';
+      setNotice({ kind: 'error', text: `${t('common.error')} — ${code}` });
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return { run, busy, notice };
+}
 
 export default function Admin() {
   const { t, f, formatDate, formatNumber } = useLang();
@@ -51,7 +87,13 @@ export default function Admin() {
     );
   }
 
+  const inbox = useMutation(() => overview.reload());
   const done = (message: string) => { setFlash(`${message} ${Date.now()}`); overview.reload(); };
+  useEffect(() => {
+    if (!flash) return;
+    const id = setTimeout(() => setFlash(null), 4000);
+    return () => clearTimeout(id);
+  }, [flash]);
 
   return (
     <>
@@ -128,6 +170,9 @@ export default function Admin() {
 
       {tab === 'inbox' && overview.data && (
         <div className="grid gap-8 lg:grid-cols-2">
+          {inbox.notice && (
+            <div className="lg:col-span-2"><Notice kind={inbox.notice.kind}>{inbox.notice.text}</Notice></div>
+          )}
           <Card className="p-6">
             <h2 className="label mb-4">{t('adm.applications')}</h2>
             {overview.data.recentApplications.length === 0 && (
@@ -152,7 +197,11 @@ export default function Admin() {
                       <button
                         key={status}
                         className="btn btn-sm"
-                        onClick={async () => { await put(`/admin/applications/${application.id}/status`, { status }); overview.reload(); }}
+                        onClick={() => inbox.run(
+                          () => put(`/admin/applications/${application.id}/status`, { status }),
+                          t('adm.saved')
+                        )}
+                        disabled={inbox.busy}
                       >
                         {status}
                       </button>
@@ -183,7 +232,11 @@ export default function Admin() {
                   {!message.handled && (
                     <button
                       className="btn btn-sm mt-3"
-                      onClick={async () => { await put(`/admin/messages/${message.id}/handled`, { handled: true }); overview.reload(); }}
+                      onClick={() => inbox.run(
+                        () => put(`/admin/messages/${message.id}/handled`, { handled: true }),
+                        t('adm.saved')
+                      )}
+                      disabled={inbox.busy}
                     >
                       {t('adm.markread')}
                     </button>
@@ -206,19 +259,21 @@ function PublicationEditor({ rows, onDone }: { rows: Pub[]; onDone: () => void }
   const { t } = useLang();
   const [draft, setDraft] = useState<any>(EMPTY_PUB);
   const [editing, setEditing] = useState<number | null>(null);
+  const { run, busy, notice } = useMutation(onDone);
 
   const save = async () => {
-    if (editing) await put(`/admin/publications/${editing}`, draft);
-    else await post('/admin/publications', draft);
+    const ok = await run(
+      () => (editing ? put(`/admin/publications/${editing}`, draft) : post('/admin/publications', draft)),
+      t('adm.saved')
+    );
+    if (!ok) return;                       // keep the draft so nothing is lost
     setDraft(EMPTY_PUB);
     setEditing(null);
-    onDone();
   };
 
-  const remove = async (id: number) => {
+  const remove = (id: number) => {
     if (!confirm(t('adm.confirmdelete'))) return;
-    await del(`/admin/publications/${id}`);
-    onDone();
+    run(() => del(`/admin/publications/${id}`), t('adm.saved'));
   };
 
   return (
@@ -246,6 +301,7 @@ function PublicationEditor({ rows, onDone }: { rows: Pub[]; onDone: () => void }
 
       <Card className="p-6 lg:sticky lg:top-28">
         <h2 className="label mb-4">{editing ? t('common.edit') : t('adm.new')}</h2>
+        {notice && <div className="mb-4"><Notice kind={notice.kind}>{notice.text}</Notice></div>}
         <div className="space-y-4">
           <Field label={t('pub.sort.title')} required>
             <input className="input" value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} />
@@ -268,7 +324,7 @@ function PublicationEditor({ rows, onDone }: { rows: Pub[]; onDone: () => void }
             <input className="input num" value={draft.doi ?? ''} onChange={e => setDraft({ ...draft, doi: e.target.value })} />
           </Field>
           <div className="flex gap-2">
-            <button className="btn btn-primary flex-1 justify-center" onClick={save} disabled={!draft.title || !draft.authors || !draft.venue}>
+            <button className="btn btn-primary flex-1 justify-center" onClick={save} disabled={busy || !draft.title || !draft.authors || !draft.venue}>
               {t('common.save')}
             </button>
             {editing && (
@@ -287,19 +343,21 @@ function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
   const { t, f, formatDate } = useLang();
   const [draft, setDraft] = useState<any>(EMPTY_NEWS);
   const [editing, setEditing] = useState<number | null>(null);
+  const { run, busy, notice } = useMutation(onDone);
 
   const save = async () => {
-    if (editing) await put(`/admin/news/${editing}`, draft);
-    else await post('/admin/news', draft);
+    const ok = await run(
+      () => (editing ? put(`/admin/news/${editing}`, draft) : post('/admin/news', draft)),
+      t('adm.saved')
+    );
+    if (!ok) return;
     setDraft(EMPTY_NEWS);
     setEditing(null);
-    onDone();
   };
 
-  const remove = async (id: number) => {
+  const remove = (id: number) => {
     if (!confirm(t('adm.confirmdelete'))) return;
-    await del(`/admin/news/${id}`);
-    onDone();
+    run(() => del(`/admin/news/${id}`), t('adm.saved'));
   };
 
   return (
@@ -327,6 +385,7 @@ function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
 
       <Card className="p-6 lg:sticky lg:top-28">
         <h2 className="label mb-4">{editing ? t('common.edit') : t('adm.new')}</h2>
+        {notice && <div className="mb-4"><Notice kind={notice.kind}>{notice.text}</Notice></div>}
         <div className="space-y-4">
           <Field label="Наслов (MK)" required>
             <input className="input" lang="mk" value={draft.title_mk} onChange={e => setDraft({ ...draft, title_mk: e.target.value })} />
@@ -359,7 +418,7 @@ function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
             </Field>
           </div>
           <div className="flex gap-2">
-            <button className="btn btn-primary flex-1 justify-center" onClick={save} disabled={!draft.title_mk || !draft.title_en}>
+            <button className="btn btn-primary flex-1 justify-center" onClick={save} disabled={busy || !draft.title_mk || !draft.title_en}>
               {t('common.save')}
             </button>
             {editing && <button className="btn" onClick={() => { setDraft(EMPTY_NEWS); setEditing(null); }}>{t('common.cancel')}</button>}
@@ -376,19 +435,21 @@ function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void 
   const { t, f } = useLang();
   const [draft, setDraft] = useState<any>(EMPTY_PERSON);
   const [editing, setEditing] = useState<number | null>(null);
+  const { run, busy, notice } = useMutation(onDone);
 
   const save = async () => {
-    if (editing) await put(`/admin/people/${editing}`, draft);
-    else await post('/admin/people', draft);
+    const ok = await run(
+      () => (editing ? put(`/admin/people/${editing}`, draft) : post('/admin/people', draft)),
+      t('adm.saved')
+    );
+    if (!ok) return;
     setDraft(EMPTY_PERSON);
     setEditing(null);
-    onDone();
   };
 
-  const remove = async (id: number) => {
+  const remove = (id: number) => {
     if (!confirm(t('adm.confirmdelete'))) return;
-    await del(`/admin/people/${id}`);
-    onDone();
+    run(() => del(`/admin/people/${id}`), t('adm.saved'));
   };
 
   return (
@@ -415,6 +476,7 @@ function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void 
 
       <Card className="p-6 lg:sticky lg:top-28">
         <h2 className="label mb-4">{editing ? t('common.edit') : t('adm.new')}</h2>
+        {notice && <div className="mb-4"><Notice kind={notice.kind}>{notice.text}</Notice></div>}
         <div className="space-y-4">
           <Field label="Име (MK)" required>
             <input className="input" lang="mk" value={draft.name_mk} onChange={e => setDraft({ ...draft, name_mk: e.target.value })} />
@@ -442,7 +504,7 @@ function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void 
             <input className="input" type="email" value={draft.email ?? ''} onChange={e => setDraft({ ...draft, email: e.target.value })} />
           </Field>
           <div className="flex gap-2">
-            <button className="btn btn-primary flex-1 justify-center" onClick={save} disabled={!draft.name_mk || !draft.name_en}>
+            <button className="btn btn-primary flex-1 justify-center" onClick={save} disabled={busy || !draft.name_mk || !draft.name_en}>
               {t('common.save')}
             </button>
             {editing && <button className="btn" onClick={() => { setDraft(EMPTY_PERSON); setEditing(null); }}>{t('common.cancel')}</button>}
