@@ -7,7 +7,6 @@
  */
 
 export const DNA_ALPHABET = 'ACGTUN';
-export const PROTEIN_ALPHABET = 'ACDEFGHIKLMNPQRSTVWY*';
 
 export type SeqKind = 'dna' | 'rna' | 'protein' | 'unknown';
 export type ParsedFasta = { id: string; description: string; seq: string };
@@ -89,22 +88,6 @@ export function gcContent(seq: string) {
   return (G + C) / seq.length;
 }
 
-/** GC skew in sliding windows: (G - C) / (G + C). Marks replication origins. */
-export function gcSkew(seq: string, window = 100) {
-  const out: { position: number; skew: number; gc: number }[] = [];
-  const step = Math.max(1, Math.floor(window / 2));
-  for (let i = 0; i + window <= seq.length; i += step) {
-    const slice = seq.slice(i, i + window);
-    const { G, C } = baseCounts(slice);
-    out.push({
-      position: i + Math.floor(window / 2),
-      skew: G + C === 0 ? 0 : (G - C) / (G + C),
-      gc: (G + C) / slice.length
-    });
-  }
-  return out;
-}
-
 /** Average molecular weight of single-stranded DNA, in daltons. */
 export function molecularWeight(seq: string) {
   const w: Record<string, number> = { A: 331.2, T: 322.2, G: 347.2, C: 307.2, U: 324.2, N: 327.0 };
@@ -135,20 +118,6 @@ export const CODON_TABLE: Record<string, string> = {
   AAT:'N', AAC:'N', AAA:'K', AAG:'K', GAT:'D', GAC:'D', GAA:'E', GAG:'E',
   TGT:'C', TGC:'C', TGA:'*', TGG:'W', CGT:'R', CGC:'R', CGA:'R', CGG:'R',
   AGT:'S', AGC:'S', AGA:'R', AGG:'R', GGT:'G', GGC:'G', GGA:'G', GGG:'G'
-};
-
-export const AA_NAMES: Record<string, [string, string]> = {
-  A: ['Аланин', 'Alanine'],        R: ['Аргинин', 'Arginine'],
-  N: ['Аспарагин', 'Asparagine'],  D: ['Аспартат', 'Aspartate'],
-  C: ['Цистеин', 'Cysteine'],      E: ['Глутамат', 'Glutamate'],
-  Q: ['Глутамин', 'Glutamine'],    G: ['Глицин', 'Glycine'],
-  H: ['Хистидин', 'Histidine'],    I: ['Изолеуцин', 'Isoleucine'],
-  L: ['Леуцин', 'Leucine'],        K: ['Лизин', 'Lysine'],
-  M: ['Метионин', 'Methionine'],   F: ['Фенилаланин', 'Phenylalanine'],
-  P: ['Пролин', 'Proline'],        S: ['Серин', 'Serine'],
-  T: ['Треонин', 'Threonine'],     W: ['Триптофан', 'Tryptophan'],
-  Y: ['Тирозин', 'Tyrosine'],      V: ['Валин', 'Valine'],
-  '*': ['Стоп', 'Stop']
 };
 
 /** Broad physico-chemical classes, used for colouring protein sequences. */
@@ -234,72 +203,6 @@ export function findOrfs(seq: string, minAminoAcids = 30): Orf[] {
   scan(dna, '+');
   scan(rc, '-');
   return orfs.sort((a, b) => b.protein.length - a.protein.length);
-}
-
-/* -------------------------------------------------------------------- KMERS */
-
-export function kmerCounts(seq: string, k: number) {
-  const counts = new Map<string, number>();
-  if (k < 1 || seq.length < k) return counts;
-  for (let i = 0; i + k <= seq.length; i++) {
-    const kmer = seq.slice(i, i + k);
-    if (/[^ACGTU]/.test(kmer)) continue;
-    counts.set(kmer, (counts.get(kmer) ?? 0) + 1);
-  }
-  return counts;
-}
-
-export function topKmers(seq: string, k: number, limit = 20) {
-  return [...kmerCounts(seq, k).entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, limit)
-    .map(([kmer, count]) => ({ kmer, count }));
-}
-
-/** Relative codon usage in one reading frame, grouped by amino acid. */
-export function codonUsage(seq: string, frame = 0) {
-  const dna = backTranscribe(seq);
-  const counts = new Map<string, number>();
-  let total = 0;
-  for (let i = frame; i + 3 <= dna.length; i += 3) {
-    const codon = dna.slice(i, i + 3);
-    if (!(codon in CODON_TABLE)) continue;
-    counts.set(codon, (counts.get(codon) ?? 0) + 1);
-    total++;
-  }
-  const byAminoAcid = new Map<string, { codon: string; count: number; fraction: number }[]>();
-  for (const [codon, count] of counts) {
-    const aa = CODON_TABLE[codon];
-    if (!byAminoAcid.has(aa)) byAminoAcid.set(aa, []);
-    byAminoAcid.get(aa)!.push({ codon, count, fraction: 0 });
-  }
-  for (const list of byAminoAcid.values()) {
-    const sum = list.reduce((s, c) => s + c.count, 0);
-    list.forEach(c => { c.fraction = sum ? c.count / sum : 0; });
-    list.sort((a, b) => b.count - a.count);
-  }
-  return { total, byAminoAcid };
-}
-
-/* ----------------------------------------------------------- HYDROPHOBICITY */
-
-/** Kyte & Doolittle (1982) hydropathy values. */
-export const KD_SCALE: Record<string, number> = {
-  A: 1.8, R: -4.5, N: -3.5, D: -3.5, C: 2.5, Q: -3.5, E: -3.5, G: -0.4,
-  H: -3.2, I: 4.5, L: 3.8, K: -3.9, M: 1.9, F: 2.8, P: -1.6, S: -0.8,
-  T: -0.7, W: -0.9, Y: -1.3, V: 4.2, '*': 0, X: 0
-};
-
-export function hydropathyProfile(protein: string, window = 9) {
-  if (protein.length < window) return [];
-  const half = Math.floor(window / 2);
-  const out: { position: number; value: number }[] = [];
-  for (let i = half; i < protein.length - half; i++) {
-    let sum = 0;
-    for (let j = i - half; j <= i + half; j++) sum += KD_SCALE[protein[j]] ?? 0;
-    out.push({ position: i + 1, value: sum / window });
-  }
-  return out;
 }
 
 /* ---------------------------------------------------------------- FORMATTING */

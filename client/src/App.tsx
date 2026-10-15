@@ -20,10 +20,7 @@ import Admin from './pages/admin/Admin';
 
 import ToolsHub from './pages/Tools';
 import Toolkit from './pages/tools/Toolkit';
-import Alignment from './pages/tools/Alignment';
 import Gel from './pages/tools/Gel';
-import Phylogeny from './pages/tools/Phylogeny';
-import Composition from './pages/tools/Composition';
 
 function NotFound() {
   const { t } = useLang();
@@ -59,10 +56,7 @@ export default function App() {
 
         <Route path="tools" element={<ToolsHub />} />
         <Route path="tools/toolkit" element={<Toolkit />} />
-        <Route path="tools/alignment" element={<Alignment />} />
         <Route path="tools/gel" element={<Gel />} />
-        <Route path="tools/phylogeny" element={<Phylogeny />} />
-        <Route path="tools/composition" element={<Composition />} />
 
         <Route path="*" element={<NotFound />} />
       </Route>
