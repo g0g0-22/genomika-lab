@@ -7,7 +7,7 @@ import { Label } from './ui';
  * a one-click example. The example button matters — a visitor who has to find
  * a sequence before the tool does anything usually never sees it work.
  */
-export function SequenceInput({ value, onChange, onExample, label, placeholder, rows = 6, extra, dropped }: {
+export function SequenceInput({ value, onChange, onExample, label, placeholder, rows = 6, extra, dropped, records, firstId, protein }: {
   value: string;
   onChange: (v: string) => void;
   onExample?: () => void;
@@ -16,6 +16,11 @@ export function SequenceInput({ value, onChange, onExample, label, placeholder, 
   rows?: number;
   extra?: React.ReactNode;
   dropped?: number;
+  /** How many FASTA records the input holds; only the first is analysed. */
+  records?: number;
+  firstId?: string;
+  /** The input reads as a protein, which nucleotide tools cannot analyse. */
+  protein?: boolean;
 }) {
   const { t } = useLang();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -57,8 +62,15 @@ export function SequenceInput({ value, onChange, onExample, label, placeholder, 
         placeholder={placeholder ?? t('seq.inputph')}
         spellCheck={false}
       />
-      {dropped ? (
+      {protein ? (
+        <p className="mt-2 text-[12px] text-srose" role="status">{t('seq.isprotein')}</p>
+      ) : dropped ? (
         <p className="mt-1.5 text-[11px] text-srose">{t('seq.invalid')} ({dropped})</p>
+      ) : null}
+      {records && records > 1 ? (
+        <p className="mt-1.5 text-[11.5px] text-muted" role="status">
+          {t('seq.multirecord').replace('{n}', String(records)).replace('{id}', firstId ?? '')}
+        </p>
       ) : null}
     </div>
   );

@@ -64,10 +64,11 @@ export default function Team() {
             aria-label={t('common.search')}
           />
           <div className="flex flex-wrap gap-1.5">
-            <button className={`chip ${!group ? 'chip-on' : ''}`} onClick={() => setGroup('')}>{t('common.all')}</button>
+            <button type="button" aria-pressed={!group} className={`chip ${!group ? 'chip-on' : ''}`} onClick={() => setGroup('')}>{t('common.all')}</button>
             {groups.data?.map(g => (
               <button
                 key={g.slug}
+                type="button" aria-pressed={group === g.slug}
                 className={`chip ${group === g.slug ? 'chip-on' : ''}`}
                 onClick={() => setGroup(g.slug)}
                 style={group === g.slug ? { borderColor: accentVar(g.accent), color: accentVar(g.accent) } : undefined}

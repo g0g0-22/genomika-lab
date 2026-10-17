@@ -16,12 +16,34 @@ type Ctx = {
   formatNumber: (n: number, opts?: Intl.NumberFormatOptions) => string;
 };
 
+/*
+ * Not every browser ships Macedonian locale data: some embedded and headless
+ * Chromium builds carry a reduced ICU, and Intl then falls back to English
+ * month names inside a Macedonian page. When that happens dates keep the
+ * en-GB layout with Macedonian month and weekday names swapped in, and numbers
+ * borrow German formatting, which uses the same separators as Macedonian.
+ */
+const HAS_MK = Intl.DateTimeFormat.supportedLocalesOf(['mk']).length > 0;
+const MK_MONTHS = ['јануари', 'февруари', 'март', 'април', 'мај', 'јуни', 'јули', 'август', 'септември', 'октомври', 'ноември', 'декември'];
+const MK_MONTHS_SHORT = ['јан.', 'фев.', 'мар.', 'апр.', 'мај', 'јун.', 'јул.', 'авг.', 'сеп.', 'окт.', 'ное.', 'дек.'];
+const MK_WEEKDAYS = ['недела', 'понеделник', 'вторник', 'среда', 'четврток', 'петок', 'сабота'];
+
+function formatMkWithoutLocaleData(d: Date, opts: Intl.DateTimeFormatOptions) {
+  return new Intl.DateTimeFormat('en-GB', opts).formatToParts(d).map(part =>
+    part.type === 'month' && opts.month === 'long' ? MK_MONTHS[d.getMonth()]
+      : part.type === 'month' && opts.month === 'short' ? MK_MONTHS_SHORT[d.getMonth()]
+      : part.type === 'weekday' ? MK_WEEKDAYS[d.getDay()]
+      : part.value
+  ).join('');
+}
+
 const LangContext = createContext<Ctx | null>(null);
 const STORAGE_KEY = 'genomika.lang';
 
 function initialLang(): Lang {
   if (typeof window === 'undefined') return 'mk';
-  const stored = window.localStorage.getItem(STORAGE_KEY);
+  let stored: string | null = null;
+  try { stored = window.localStorage.getItem(STORAGE_KEY); } catch { /* storage blocked */ }
   if (stored === 'mk' || stored === 'en') return stored;
   return navigator.language?.toLowerCase().startsWith('mk') ? 'mk' : 'en';
 }
@@ -54,9 +76,13 @@ export function LangProvider({ children }: { children: ReactNode }) {
       formatDate: (iso, opts) => {
         const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
         if (Number.isNaN(d.getTime())) return iso;
-        return new Intl.DateTimeFormat(locale, opts ?? { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+        const options = opts ?? { day: 'numeric', month: 'long', year: 'numeric' };
+        return lang === 'mk' && !HAS_MK
+          ? formatMkWithoutLocaleData(d, options)
+          : new Intl.DateTimeFormat(locale, options).format(d);
       },
-      formatNumber: (n, opts) => new Intl.NumberFormat(locale, opts).format(n)
+      formatNumber: (n, opts) =>
+        new Intl.NumberFormat(lang === 'mk' && !HAS_MK ? 'de-DE' : locale, opts).format(n)
     };
   }, [lang, setLang, toggle]);
 

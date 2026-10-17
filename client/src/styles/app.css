@@ -2,9 +2,9 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ============================================================= PALETTE ===
-   Text and border values are chosen against measured WCAG ratios, not by eye:
-   --muted 4.64:1 and --accent 4.63:1 on paper (AA for normal text), and
-   --line-firm 3.04:1 (AA for non-text UI boundaries) in both themes.
+   Text and border values are chosen against measured WCAG ratios, checked on
+   every surface they appear on rather than on paper alone. Re-run the check
+   with:  node scripts/check-contrast.mjs
 
    The third categorical series is a rose rather than an amber. Green and
    amber are both long-wavelength and collapsed to ΔE 9.3 under simulated
@@ -19,11 +19,11 @@
   --ground-2:   #EBEBE6;
   --line:       #E4E4DE;
   --line-soft:  #EFEFEA;
-  --line-firm:  #959585;
+  --line-firm:  #888876;
   --ink:        #141413;
   --ink-2:      #4D4D49;
-  --muted:      #75756E;
-  --accent:     #5D7C65;
+  --muted:      #6A6A64;
+  --accent:     #54715C;
   --accent-soft:#DDE7DD;
   --solid:      #171716;   /* dark pill fill  */
   --on-solid:   #FAFAF8;
@@ -39,7 +39,7 @@
   --ground-2:   #1F1F1E;
   --line:       #2A2A28;
   --line-soft:  #212120;
-  --line-firm:  #61615C;
+  --line-firm:  #6A6A64;
   --ink:        #F3F3F0;
   --ink-2:      #C3C3BD;
   --muted:      #8B8B84;
@@ -207,7 +207,10 @@ h1, h2, h3, h4 {
     font-size: 14px;
     transition: border-color .18s ease;
   }
-  .input:focus { outline: none; border-color: var(--ink); }
+  /* The border darkens on any focus; keyboard focus also keeps the global
+     ring, which an earlier "outline: none" here had silently removed. */
+  .input:focus { border-color: var(--ink); }
+  .input:focus:not(:focus-visible) { outline: none; }
   .input::placeholder { color: var(--muted); }
   textarea.input { line-height: 1.6; resize: vertical; }
   select.input { cursor: pointer; }

@@ -19,11 +19,6 @@ const AA_COLOR: Record<string, string> = {
 };
 
 /**
- * Monospaced sequence display with a position gutter, coloured by nucleotide or
- * by amino-acid class. Long sequences scroll inside their own pane rather than
- * stretching the page.
- */
-/**
  * Every residue becomes its own <span> so it can be coloured, which puts a
  * hard ceiling on how much can be drawn: the file picker accepts two million
  * characters, and rendering that many nodes would hang the tab. Past the cap
@@ -31,6 +26,11 @@ const AA_COLOR: Record<string, string> = {
  */
 const MAX_RENDERED = 20_000;
 
+/**
+ * Monospaced sequence display with a position gutter, coloured by nucleotide or
+ * by amino-acid class. Long sequences scroll inside their own pane rather than
+ * stretching the page.
+ */
 export function SeqView({ seq, kind = 'nucleotide', lineLength = 60, maxHeight = 260, highlight }: {
   seq: string;
   kind?: 'nucleotide' | 'protein' | 'plain';

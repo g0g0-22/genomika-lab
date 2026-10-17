@@ -1,10 +1,14 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { requireAuth } from '../lib/auth.js';
+import { localDate, isRealDate, daysFromToday } from '../lib/dates.js';
+
+/** How far ahead a slot may be reserved, and how many a person may hold. */
+const MAX_DAYS_AHEAD = 180;
+const MAX_ACTIVE_PER_USER = 20;
 
 export const booking = Router();
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 booking.get('/instruments', (req, res) => {
   const { category } = req.query;
@@ -25,7 +29,7 @@ booking.get('/instruments/:slug/availability', (req, res) => {
   const instrument = db.prepare('SELECT * FROM instruments WHERE slug = ?').get(req.params.slug);
   if (!instrument) return res.status(404).json({ error: 'not_found' });
   const date = String(req.query.date || '');
-  if (!DATE_RE.test(date)) return res.status(400).json({ error: 'invalid_date' });
+  if (!isRealDate(date)) return res.status(400).json({ error: 'invalid_date' });
 
   const rows = db.prepare(
     `SELECT b.id, b.start_hour, b.end_hour, b.purpose, b.status, b.user_name,
@@ -44,12 +48,17 @@ booking.get('/instruments/:slug/availability', (req, res) => {
    * only for signed-in callers.
    */
   const signedIn = Boolean(req.user);
+  // The same rule POST /bookings applies, so the grid never offers an hour
+  // the server would refuse.
+  const ahead = daysFromToday(date);
+  const currentHour = new Date().getHours();
   const slots = [];
   for (let h = instrument.open_from; h < instrument.open_to; h++) {
     const taken = rows.find(b => h >= b.start_hour && h < b.end_hour);
     slots.push({
       hour: h,
       free: !taken,
+      past: ahead < 0 || (ahead === 0 && h <= currentHour),
       booking: taken && signedIn
         ? { id: taken.id, user_name: taken.user_name, user_name_mk: taken.user_name_mk,
             user_name_en: taken.user_name_en, purpose: taken.purpose }
@@ -72,15 +81,23 @@ booking.post('/bookings', requireAuth, (req, res) => {
   const instrument = db.prepare('SELECT * FROM instruments WHERE slug = ?').get(String(instrument_slug || ''));
   if (!instrument) return res.status(404).json({ error: 'unknown_instrument' });
   if (instrument.status !== 'available') return res.status(409).json({ error: 'instrument_unavailable' });
-  if (!DATE_RE.test(String(date || ''))) return res.status(400).json({ error: 'invalid_date' });
+  if (!isRealDate(date)) return res.status(400).json({ error: 'invalid_date' });
 
   const s = Number(start_hour), e = Number(end_hour);
   if (!Number.isInteger(s) || !Number.isInteger(e) || e <= s) return res.status(400).json({ error: 'invalid_range' });
   if (s < instrument.open_from || e > instrument.open_to) return res.status(400).json({ error: 'outside_opening_hours' });
   if (e - s > instrument.max_hours) return res.status(400).json({ error: 'exceeds_max_hours', max_hours: instrument.max_hours });
 
-  const today = new Date().toISOString().slice(0, 10);
-  if (date < today) return res.status(400).json({ error: 'date_in_past' });
+  const ahead = daysFromToday(date);
+  if (ahead < 0) return res.status(400).json({ error: 'date_in_past' });
+  if (ahead > MAX_DAYS_AHEAD) return res.status(400).json({ error: 'too_far_ahead', max_days: MAX_DAYS_AHEAD });
+  // An hour that has already started today is as unbookable as yesterday.
+  if (ahead === 0 && s <= new Date().getHours()) return res.status(400).json({ error: 'date_in_past' });
+
+  const active = db.prepare(
+    "SELECT COUNT(*) n FROM bookings WHERE user_id = ? AND status != 'cancelled' AND date >= ?"
+  ).get(req.user.id, localDate()).n;
+  if (active >= MAX_ACTIVE_PER_USER) return res.status(409).json({ error: 'quota_exceeded', max: MAX_ACTIVE_PER_USER });
 
   // Overlap test: two intervals collide unless one ends before the other begins.
   const clash = db.prepare(
@@ -117,6 +134,11 @@ booking.delete('/bookings/:id', requireAuth, (req, res) => {
   if (!b) return res.status(404).json({ error: 'not_found' });
   const owns = b.user_id === req.user.id || b.user_email === req.user.email;
   if (!owns && req.user.role !== 'admin') return res.status(403).json({ error: 'not_your_booking' });
+  // A booking that has run its course is a record of use, not a reservation.
+  const ahead = daysFromToday(b.date);
+  if (ahead < 0 || (ahead === 0 && b.end_hour <= new Date().getHours())) {
+    return res.status(409).json({ error: 'booking_finished' });
+  }
   db.prepare("UPDATE bookings SET status = 'cancelled' WHERE id = ?").run(b.id);
   res.json({ ok: true });
 });

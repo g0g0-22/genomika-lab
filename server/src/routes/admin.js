@@ -4,6 +4,8 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from '../db.js';
 import { requireAdmin } from '../lib/auth.js';
+import { localDate } from '../lib/dates.js';
+import { validate, text, int, num, bool, oneOf, date, pattern, ref } from '../lib/validate.js';
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR
   || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'uploads');
@@ -37,40 +39,109 @@ admin.get('/overview', (_req, res) => {
        JOIN instruments i ON i.id = b.instrument_id
        LEFT JOIN users u ON u.id = b.user_id
        LEFT JOIN people p ON p.id = u.person_id
-       WHERE b.status != 'cancelled' AND b.date >= date('now') ORDER BY b.date, b.start_hour LIMIT 20`).all(),
+       WHERE b.status != 'cancelled' AND b.date >= date('now', 'localtime') ORDER BY b.date, b.start_hour LIMIT 20`).all(),
     rsvps: db.prepare(
       `SELECT r.*, e.title_en AS event_en, e.title_mk AS event_mk FROM rsvps r
        JOIN events e ON e.id = r.event_id ORDER BY r.created_at DESC LIMIT 20`).all()
   });
 });
 
-/* ------------------------------------------------------ PUBLICATIONS CRUD */
-const PUB_FIELDS = ['title','authors','venue','year','type','doi','citations','open_access','abstract','group_id','keywords'];
+/* ------------------------------------------------------------- SCHEMAS */
 
-/*
- * Columns that are NOT NULL with a default. Passing an explicit null defeats
- * the default and raises a constraint error, so an omitted field has to fall
- * back to the same value the schema would have used.
- */
-const PUB_DEFAULTS = { type: 'article', citations: 0, open_access: 1, year: new Date().getFullYear() };
+const NEWS_TAGS = ['news', 'publication', 'grant', 'outreach', 'facility', 'award', 'people'];
+const SENIORITY = ['faculty', 'postdoc', 'staff', 'phd', 'msc'];
+const THIS_YEAR = new Date().getFullYear();
+
+const PUBLICATION = {
+  title: text({ required: true, max: 300 }),
+  authors: text({ required: true, max: 500 }),
+  venue: text({ required: true, max: 200 }),
+  year: int({ min: 1900, max: THIS_YEAR + 1 }),
+  type: oneOf(['article', 'conference', 'preprint']),
+  doi: pattern(/^10\.\d{4,9}\/\S+$/, { max: 120 }),
+  citations: int({ min: 0, max: 1_000_000 }),
+  open_access: bool(),
+  abstract: text({ max: 4000 }),
+  group_id: ref('groups'),
+  keywords: text({ max: 300 })
+};
+/* NOT NULL columns with schema defaults: an omitted value must not be sent as null. */
+const PUBLICATION_DEFAULTS = { type: 'article', citations: 0, open_access: 1, year: THIS_YEAR };
+
+const NEWS = {
+  title_mk: text({ required: true, max: 300 }),
+  title_en: text({ required: true, max: 300 }),
+  excerpt_mk: text({ max: 600 }), excerpt_en: text({ max: 600 }),
+  body_mk: text({ max: 8000 }), body_en: text({ max: 8000 }),
+  date: date(),
+  tag: oneOf(NEWS_TAGS)
+};
+
+const PERSON = {
+  name_mk: text({ required: true, max: 120 }),
+  name_en: text({ required: true, max: 120 }),
+  role_mk: text({ max: 120 }), role_en: text({ max: 120 }),
+  seniority: oneOf(SENIORITY),
+  group_id: ref('groups'),
+  email: pattern(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, { max: 254 }),
+  orcid: pattern(/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/),
+  github: pattern(/^[A-Za-z0-9-]{1,39}$/),
+  bio_mk: text({ max: 4000 }), bio_en: text({ max: 4000 }),
+  interests: text({ max: 500 }),
+  joined_year: int({ min: 1950, max: THIS_YEAR + 1 }),
+  hue: int({ min: 0, max: 360 })
+};
+/* role_* are NOT NULL in the schema; an empty role is an empty string. */
+const PERSON_DEFAULTS = { seniority: 'researcher', role_mk: '', role_en: '', hue: 140, joined_year: THIS_YEAR };
+
+const DATASET = {
+  title_mk: text({ required: true, max: 300 }), title_en: text({ required: true, max: 300 }),
+  description_mk: text({ max: 4000 }), description_en: text({ max: 4000 }),
+  format: text({ required: true, max: 60 }),
+  size_mb: num({ min: 0, max: 10_000_000 }),
+  license: text({ required: true, max: 60 }),
+  year: int({ min: 1900, max: THIS_YEAR + 1 }),
+  doi: pattern(/^10\.\d{4,9}\/\S+$/, { max: 120 }),
+  organism: text({ max: 200 })
+};
+
+const invalid = (res, errors) => res.status(400).json({ error: 'validation_failed', fields: errors });
+const isUnique = (err) => String(err?.code || err?.message).includes('UNIQUE');
+
+/** Writes only the validated fields; never the raw request body. */
+function update(table, id, fields) {
+  const keys = Object.keys(fields);
+  if (!keys.length) return;
+  db.prepare(`UPDATE ${table} SET ${keys.map(k => `${k} = @${k}`).join(', ')} WHERE id = @id`).run({ ...fields, id });
+}
+
+function insert(table, fields) {
+  const keys = Object.keys(fields);
+  return db.prepare(`INSERT INTO ${table} (${keys.join(',')}) VALUES (${keys.map(k => `@${k}`).join(',')})`).run(fields);
+}
+
+/* NOT NULL columns refuse an explicit null, so a field cleared to null on
+   update is only written when the column allows it. */
+const withoutNulls = (fields, nullable) =>
+  Object.fromEntries(Object.entries(fields).filter(([k, v]) => v !== null || nullable.includes(k)));
+
+/* ------------------------------------------------------ PUBLICATIONS CRUD */
 
 admin.post('/publications', (req, res) => {
-  const b = req.body || {};
-  if (!String(b.title || '').trim()) return res.status(400).json({ error: 'title_required' });
-  if (!String(b.authors || '').trim()) return res.status(400).json({ error: 'authors_required' });
-  const values = PUB_FIELDS.map(f => b[f] ?? PUB_DEFAULTS[f] ?? null);
-  const info = db.prepare(
-    `INSERT INTO publications (${PUB_FIELDS.join(',')}) VALUES (${PUB_FIELDS.map(() => '?').join(',')})`
-  ).run(...values);
+  const { value, errors, ok } = validate(PUBLICATION, req.body);
+  if (!ok) return invalid(res, errors);
+  const fields = { ...value };
+  for (const [k, v] of Object.entries(PUBLICATION_DEFAULTS)) if (fields[k] === null) fields[k] = v;
+  const info = insert('publications', fields);
   res.status(201).json(db.prepare('SELECT * FROM publications WHERE id = ?').get(info.lastInsertRowid));
 });
 
 admin.put('/publications/:id', (req, res) => {
-  const existing = db.prepare('SELECT * FROM publications WHERE id = ?').get(req.params.id);
+  const existing = db.prepare('SELECT id FROM publications WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not_found' });
-  const merged = { ...existing, ...req.body };
-  db.prepare(`UPDATE publications SET ${PUB_FIELDS.map(f => `${f} = @${f}`).join(', ')} WHERE id = @id`)
-    .run({ ...merged, id: existing.id });
+  const { value, errors, ok } = validate(PUBLICATION, req.body, { partial: true });
+  if (!ok) return invalid(res, errors);
+  update('publications', existing.id, withoutNulls(value, ['doi', 'abstract', 'group_id', 'keywords']));
   res.json(db.prepare('SELECT * FROM publications WHERE id = ?').get(existing.id));
 });
 
@@ -81,30 +152,39 @@ admin.delete('/publications/:id', (req, res) => {
 });
 
 /* --------------------------------------------------------------- NEWS CRUD */
-const NEWS_FIELDS = ['slug','title_mk','title_en','excerpt_mk','excerpt_en','body_mk','body_en','date','tag'];
 
 admin.post('/news', (req, res) => {
-  const b = req.body || {};
-  if (!String(b.title_en || '').trim() || !String(b.title_mk || '').trim())
-    return res.status(400).json({ error: 'both_titles_required' });
-  const row = { ...Object.fromEntries(NEWS_FIELDS.map(f => [f, b[f] ?? null])) };
-  row.slug = b.slug ? slugify(b.slug) : slugify(b.title_en);
-  row.date = b.date || new Date().toISOString().slice(0, 10);
-  row.tag = b.tag || 'news';
+  const { value, errors, ok } = validate(NEWS, req.body);
+  if (!ok) return invalid(res, errors);
+  const fields = {
+    ...value,
+    slug: req.body?.slug ? slugify(req.body.slug) : slugify(value.title_en),
+    date: value.date || localDate(),
+    tag: value.tag || 'news'
+  };
   try {
-    const info = db.prepare(`INSERT INTO news (${NEWS_FIELDS.join(',')}) VALUES (${NEWS_FIELDS.map(f => `@${f}`).join(',')})`).run(row);
+    const info = insert('news', fields);
     res.status(201).json(db.prepare('SELECT * FROM news WHERE id = ?').get(info.lastInsertRowid));
   } catch (err) {
-    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'slug_taken' });
+    if (isUnique(err)) return res.status(409).json({ error: 'slug_taken' });
     throw err;
   }
 });
 
 admin.put('/news/:id', (req, res) => {
-  const existing = db.prepare('SELECT * FROM news WHERE id = ?').get(req.params.id);
+  const existing = db.prepare('SELECT id FROM news WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not_found' });
-  const merged = { ...existing, ...req.body, id: existing.id };
-  db.prepare(`UPDATE news SET ${NEWS_FIELDS.map(f => `${f} = @${f}`).join(', ')} WHERE id = @id`).run(merged);
+  const { value, errors, ok } = validate(NEWS, req.body, { partial: true });
+  if (!ok) return invalid(res, errors);
+  const fields = withoutNulls(value, ['excerpt_mk', 'excerpt_en', 'body_mk', 'body_en']);
+  if (req.body?.slug) fields.slug = slugify(req.body.slug);
+  try {
+    update('news', existing.id, fields);
+  } catch (err) {
+    // Creating with a taken slug was a 409; updating to one was a 500.
+    if (isUnique(err)) return res.status(409).json({ error: 'slug_taken' });
+    throw err;
+  }
   res.json(db.prepare('SELECT * FROM news WHERE id = ?').get(existing.id));
 });
 
@@ -115,40 +195,44 @@ admin.delete('/news/:id', (req, res) => {
 });
 
 /* ------------------------------------------------------------- DATASETS */
+
 admin.put('/datasets/:id', (req, res) => {
-  const existing = db.prepare('SELECT * FROM datasets WHERE id = ?').get(req.params.id);
+  const existing = db.prepare('SELECT id FROM datasets WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not_found' });
-  const fields = ['title_mk','title_en','description_mk','description_en','format','size_mb','license','year','doi','organism'];
-  const merged = { ...existing, ...req.body, id: existing.id };
-  db.prepare(`UPDATE datasets SET ${fields.map(f => `${f} = @${f}`).join(', ')} WHERE id = @id`).run(merged);
+  const { value, errors, ok } = validate(DATASET, req.body, { partial: true });
+  if (!ok) return invalid(res, errors);
+  update('datasets', existing.id, withoutNulls(value, ['description_mk', 'description_en', 'doi', 'organism']));
   res.json(db.prepare('SELECT * FROM datasets WHERE id = ?').get(existing.id));
 });
 
 /* ---------------------------------------------------------------- PEOPLE */
-const PERSON_FIELDS = ['slug','name_mk','name_en','role_mk','role_en','seniority','group_id','email','orcid','github','bio_mk','bio_en','interests','joined_year','hue'];
 
 admin.post('/people', (req, res) => {
-  const b = req.body || {};
-  if (!String(b.name_en || '').trim()) return res.status(400).json({ error: 'name_required' });
-  const row = Object.fromEntries(PERSON_FIELDS.map(f => [f, b[f] ?? null]));
-  row.slug = b.slug ? slugify(b.slug) : slugify(b.name_en);
-  row.seniority = b.seniority || 'researcher';
-  row.hue = Number(b.hue) || 140;
-  row.joined_year = Number(b.joined_year) || new Date().getFullYear();
+  const { value, errors, ok } = validate(PERSON, req.body);
+  if (!ok) return invalid(res, errors);
+  const fields = { ...value, slug: req.body?.slug ? slugify(req.body.slug) : slugify(value.name_en) };
+  for (const [k, v] of Object.entries(PERSON_DEFAULTS)) if (fields[k] === null || fields[k] === undefined) fields[k] = v;
   try {
-    const info = db.prepare(`INSERT INTO people (${PERSON_FIELDS.join(',')}) VALUES (${PERSON_FIELDS.map(f => `@${f}`).join(',')})`).run(row);
+    const info = insert('people', fields);
     res.status(201).json(db.prepare('SELECT * FROM people WHERE id = ?').get(info.lastInsertRowid));
   } catch (err) {
-    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'slug_taken' });
+    if (isUnique(err)) return res.status(409).json({ error: 'slug_taken' });
     throw err;
   }
 });
 
 admin.put('/people/:id', (req, res) => {
-  const existing = db.prepare('SELECT * FROM people WHERE id = ?').get(req.params.id);
+  const existing = db.prepare('SELECT id FROM people WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not_found' });
-  const merged = { ...existing, ...req.body, id: existing.id };
-  db.prepare(`UPDATE people SET ${PERSON_FIELDS.map(f => `${f} = @${f}`).join(', ')} WHERE id = @id`).run(merged);
+  const { value, errors, ok } = validate(PERSON, req.body, { partial: true });
+  if (!ok) return invalid(res, errors);
+  try {
+    update('people', existing.id, withoutNulls(value,
+      ['group_id', 'email', 'orcid', 'github', 'bio_mk', 'bio_en', 'interests', 'joined_year']));
+  } catch (err) {
+    if (isUnique(err)) return res.status(409).json({ error: 'slug_taken' });
+    throw err;
+  }
   res.json(db.prepare('SELECT * FROM people WHERE id = ?').get(existing.id));
 });
 

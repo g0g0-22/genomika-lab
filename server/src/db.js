@@ -9,14 +9,36 @@ export const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+/*
+ * Schema versioning. CREATE TABLE IF NOT EXISTS builds a fresh database but can
+ * never change an existing one, and the database lives on a volume that
+ * survives every redeploy. Each change after the baseline is appended to
+ * MIGRATIONS and runs once, in order, recorded in SQLite's own user_version.
+ */
+const MIGRATIONS = [
+  // 1 — baseline: the schema created below.
+  () => {}
+];
+
 export function migrate() {
+  createBaseline();
+  const current = db.pragma('user_version', { simple: true });
+  for (let version = current; version < MIGRATIONS.length; version++) {
+    db.transaction(() => {
+      MIGRATIONS[version]();
+      db.pragma(`user_version = ${version + 1}`);
+    })();
+  }
+}
+
+function createBaseline() {
   db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'researcher',
-    person_id INTEGER,
+    person_id INTEGER REFERENCES people(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -26,7 +48,7 @@ export function migrate() {
     name_mk TEXT NOT NULL, name_en TEXT NOT NULL,
     tagline_mk TEXT, tagline_en TEXT,
     description_mk TEXT, description_en TEXT,
-    accent TEXT NOT NULL DEFAULT 'lime',
+    accent TEXT NOT NULL DEFAULT 'green',
     founded INTEGER
   );
 
@@ -196,6 +218,20 @@ export function migrate() {
     handled INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  /*
+   * A project's status follows from its dates. Storing it meant the stored
+   * value went stale on its own — a project kept saying "active" months after
+   * it ended. Every read goes through this view instead.
+   */
+  DROP VIEW IF EXISTS projects_live;
+  CREATE VIEW projects_live AS
+    SELECT id, slug, title_mk, title_en, abstract_mk, abstract_en, group_id,
+           funder, grant_code, budget_eur, start_date, end_date,
+           CASE WHEN date('now', 'localtime') < start_date THEN 'planned'
+                WHEN date('now', 'localtime') > end_date   THEN 'completed'
+                ELSE 'active' END AS status
+    FROM projects;
 
   CREATE TABLE IF NOT EXISTS partners (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

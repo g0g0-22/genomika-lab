@@ -40,14 +40,24 @@ after(() => {
 
 /* ------------------------------------------------------------- helpers -- */
 
-const call = (path, { token, method = 'GET', body } = {}) =>
+/*
+ * Per-client limits key on the caller's address, and every request here comes
+ * from loopback. Each call therefore presents its own address from the range
+ * reserved for benchmarking (RFC 2544), so a limit trips only in the tests
+ * that pin an address on purpose.
+ */
+let nextClient = 0;
+const freshClient = () => `198.18.${(++nextClient >> 8) & 255}.${nextClient & 255}`;
+
+const call = (path, { token, method = 'GET', body, ip = freshClient(), raw } = {}) =>
   fetch(base + path, {
     method,
     headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
+      ...(body !== undefined || raw ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'X-Forwarded-For': ip
     },
-    ...(body ? { body: JSON.stringify(body) } : {})
+    ...(raw !== undefined ? { body: raw } : body !== undefined ? { body: JSON.stringify(body) } : {})
   });
 
 const json = async (...args) => {
@@ -59,6 +69,9 @@ const signIn = async (email, password = 'genomika2026') => {
   const { body } = await json('/auth/login', { method: 'POST', body: { email, password } });
   return body.token;
 };
+
+const { db } = await import('../src/db.js');
+const jwt = (await import('jsonwebtoken')).default;
 
 const dayFromNow = (n) => {
   const d = new Date();
@@ -109,13 +122,12 @@ test('the admin API is closed to anonymous and to non-admin accounts', async () 
   assert.equal((await json('/admin/overview', { token: admin })).status, 200);
 });
 
-test('role comes from the database, so it cannot be claimed by the token', async () => {
-  // A researcher's own valid token must not grant admin, whatever it contains.
-  const researcher = await signIn('n.avramovski@genomika.mk');
-  const create = await json('/admin/publications', {
-    token: researcher, method: 'POST', body: { title: 'x', authors: 'y', venue: 'z', year: 2026 }
-  });
-  assert.equal(create.status, 403);
+test('role comes from the database, so a token claiming admin does not grant it', async () => {
+  // A correctly signed token for a researcher's account that asserts role: admin.
+  const researcher = db.prepare("SELECT id, email FROM users WHERE role = 'researcher' LIMIT 1").get();
+  const forged = jwt.sign({ sub: researcher.id, email: researcher.email, role: 'admin' }, process.env.JWT_SECRET);
+  assert.equal((await json('/admin/overview', { token: forged })).status, 403);
+  assert.equal((await json('/auth/me', { token: forged })).body.user.role, 'researcher');
 });
 
 /* ------------------------------------------------------------- BOOKING -- */
@@ -261,7 +273,18 @@ test('the unauthenticated week endpoint is gone', async () => {
 
 /* ---------------------------------------------------------------- RSVP -- */
 
-test('event registration validates, deduplicates and respects capacity', async () => {
+test('an event refuses registrations once it is full', async () => {
+  const id = (await json('/events?scope=upcoming')).body.at(-1).id;
+  db.prepare('UPDATE events SET capacity = 2 WHERE id = ?').run(id);
+  for (const n of [1, 2]) {
+    assert.equal((await json(`/events/${id}/rsvp`, { method: 'POST', body: { name: `Guest ${n}`, email: `cap${n}@example.mk` } })).status, 201);
+  }
+  const third = await json(`/events/${id}/rsvp`, { method: 'POST', body: { name: 'Guest 3', email: 'cap3@example.mk' } });
+  assert.equal(third.status, 409);
+  assert.equal(third.body.error, 'event_full');
+});
+
+test('event registration validates and deduplicates', async () => {
   const events = (await json('/events?scope=upcoming')).body;
   assert.ok(events.length > 0);
   const id = events[0].id;
@@ -286,12 +309,21 @@ test('upcoming and past partition the events, with no event in both', async () =
   const all = (await json('/events?scope=all')).body;
 
   assert.equal(upcoming.length + past.length, all.length);
+  assert.ok(past.length >= 1, 'there is at least one past event to partition');
+  assert.ok(upcoming.length >= 1);
   const overlap = upcoming.filter(u => past.some(p => p.id === u.id));
   assert.deepEqual(overlap, [], 'an event cannot be both upcoming and past');
 
   const now = Date.now();
   upcoming.forEach(e => assert.ok(new Date(e.starts_at).getTime() >= now - 60_000, `${e.title_en} is genuinely ahead`));
   past.forEach(e => assert.ok(new Date(e.starts_at).getTime() < now + 60_000));
+});
+
+test('an event that has already happened takes no registrations', async () => {
+  const [held] = (await json('/events?scope=past')).body;
+  const res = await json(`/events/${held.id}/rsvp`, { method: 'POST', body: { name: 'Late Guest', email: 'late@example.mk' } });
+  assert.equal(res.status, 409);
+  assert.equal(res.body.error, 'event_past');
 });
 
 test('the calendar export is valid iCalendar in UTC', async () => {
@@ -308,7 +340,7 @@ test('the calendar export is valid iCalendar in UTC', async () => {
 /* --------------------------------------------------------- APPLICATIONS -- */
 
 test('an application is accepted and returns a reference', async () => {
-  const { status, body } = await json('/positions/phd-pangenome-2026/apply', {
+  const { status, body } = await json('/positions/phd-pangenome/apply', {
     method: 'POST',
     body: { name: 'Ana Nikolova', email: 'ana@example.mk',
             motivation: 'I have been writing alignment code since my second year and want to work on graph pangenomes.' }
@@ -318,7 +350,7 @@ test('an application is accepted and returns a reference', async () => {
 });
 
 test('application validation reports every offending field at once', async () => {
-  const { status, body } = await json('/positions/phd-pangenome-2026/apply', {
+  const { status, body } = await json('/positions/phd-pangenome/apply', {
     method: 'POST', body: { name: 'X', email: 'bad', motivation: 'short' }
   });
   assert.equal(status, 400);
@@ -327,7 +359,7 @@ test('application validation reports every offending field at once', async () =>
 });
 
 test('a closed position accepts nothing', async () => {
-  const { status, body } = await json('/positions/postdoc-structure-2025/apply', {
+  const { status, body } = await json('/positions/postdoc-structure/apply', {
     method: 'POST',
     body: { name: 'Ana Nikolova', email: 'ana@example.mk',
             motivation: 'A motivation letter comfortably past the minimum length requirement.' }
@@ -342,7 +374,7 @@ test('a rejected upload leaves nothing on disk', async () => {
   // Valid 1 MB PDF, but the motivation is too short: the whole request must fail
   // without the file ever being written.
   const payload = Buffer.concat([Buffer.from('%PDF-1.4'), Buffer.alloc(1024 * 1024)]).toString('base64');
-  const rejected = await json('/positions/phd-pangenome-2026/apply', {
+  const rejected = await json('/positions/phd-pangenome/apply', {
     method: 'POST',
     body: { name: 'Ana', email: 'ana@example.mk', motivation: 'too short',
             cv: { name: 'cv.pdf', type: 'application/pdf', size: 1048584, data: `data:application/pdf;base64,${payload}` } }
@@ -355,7 +387,7 @@ test('a rejected upload leaves nothing on disk', async () => {
 
 test('an upload is rejected when its bytes do not match its declared type', async () => {
   const notAPdf = Buffer.from('<script>this is not a document</script>').toString('base64');
-  const { status, body } = await json('/positions/phd-pangenome-2026/apply', {
+  const { status, body } = await json('/positions/phd-pangenome/apply', {
     method: 'POST',
     body: { name: 'Ana Nikolova', email: 'ana@example.mk',
             motivation: 'A motivation letter comfortably past the minimum length requirement.',
@@ -367,7 +399,7 @@ test('an upload is rejected when its bytes do not match its declared type', asyn
 
 test('omitting the declared type does not skip the type check', async () => {
   const notAPdf = Buffer.from('plain text pretending to be a CV').toString('base64');
-  const { status, body } = await json('/positions/phd-pangenome-2026/apply', {
+  const { status, body } = await json('/positions/phd-pangenome/apply', {
     method: 'POST',
     body: { name: 'Ana Nikolova', email: 'ana@example.mk',
             motivation: 'A motivation letter comfortably past the minimum length requirement.',
@@ -379,7 +411,7 @@ test('omitting the declared type does not skip the type check', async () => {
 
 test('an accepted upload is written exactly once', async () => {
   const pdf = Buffer.concat([Buffer.from('%PDF-1.4 '), Buffer.from('a real enough document')]).toString('base64');
-  const { status } = await json('/positions/intern-summer-2026/apply', {
+  const { status } = await json('/positions/intern-summer/apply', {
     method: 'POST',
     body: { name: 'Bojan Petrov', email: 'bojan@example.mk',
             motivation: 'A motivation letter comfortably past the minimum length requirement.',
@@ -391,20 +423,28 @@ test('an accepted upload is written exactly once', async () => {
   assert.match(files[0], /-cv\.pdf$/);
 });
 
-test('repeated failed logins are throttled, and a success clears the count', async () => {
-  const email = 'throttle-probe@genomika.mk';          // no such account
-  let sawThrottle = false;
-  for (let i = 0; i < 12; i++) {
-    const { status } = await json('/auth/login', { method: 'POST', body: { email, password: 'wrong' } });
-    if (status === 429) { sawThrottle = true; break; }
-    assert.equal(status, 401);
+test('failed sign-ins throttle the client that made them, and nobody else', async () => {
+  const attacker = '203.0.113.7';
+  let throttledAt = null;
+  for (let i = 1; i <= 12 && !throttledAt; i++) {
+    const { status } = await json('/auth/login', { ip: attacker, method: 'POST', body: { email: 'admin@genomika.mk', password: 'wrong' } });
+    if (status === 429) throttledAt = i;
   }
-  assert.ok(sawThrottle, 'guessing must be refused before twelve attempts');
+  assert.ok(throttledAt && throttledAt <= 9, `guessing refused by the ninth attempt (at ${throttledAt})`);
 
-  // A different address is unaffected — the limit is not global.
-  const other = await json('/auth/login', {
-    method: 'POST', body: { email: 'admin@genomika.mk', password: 'genomika2026' } });
-  assert.equal(other.status, 200);
+  // The account the attacker was guessing still works for its owner elsewhere —
+  // keying on the account would have locked them out.
+  const owner = await json('/auth/login', { ip: '203.0.113.50', method: 'POST', body: { email: 'admin@genomika.mk', password: 'genomika2026' } });
+  assert.equal(owner.status, 200);
+});
+
+test('a successful sign-in resets that client\'s failure count', async () => {
+  const ip = '203.0.113.21';
+  const attempt = (password) => json('/auth/login', { ip, method: 'POST', body: { email: 's.jovanoska@genomika.mk', password } });
+  for (let i = 0; i < 7; i++) assert.equal((await attempt('wrong')).status, 401);
+  assert.equal((await attempt('genomika2026')).status, 200);
+  // Seven more failures would have been fifteen in one window without the reset.
+  for (let i = 0; i < 7; i++) assert.equal((await attempt('wrong')).status, 401, `failure ${i + 1} after reset`);
 });
 
 test('an administrator can download a stored CV, and only an administrator', async () => {
@@ -434,7 +474,7 @@ test('an administrator can download a stored CV, and only an administrator', asy
 
 test('a CV download is refused for an application that has none', async () => {
   const token = await signIn('admin@genomika.mk');
-  const applied = await json('/positions/intern-summer-2026/apply', {
+  const applied = await json('/positions/intern-summer/apply', {
     method: 'POST',
     body: { name: 'No Attachment', email: 'noattach@example.mk',
             motivation: 'A motivation letter comfortably past the minimum length requirement.' }
@@ -453,14 +493,20 @@ test('admin inbox actions report a missing record instead of claiming success', 
   assert.equal((await json('/admin/applications/999999/status', { token, method: 'PUT', body: { status: 'shortlisted' } })).status, 404);
 });
 
-test('a server error does not return the exception text', async () => {
-  // A malformed JSON body trips the body parser, which the error handler owns.
-  const res = await fetch(base + '/messages', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{ not json'
-  });
-  assert.ok(res.status >= 400);
-  const text = await res.text();
-  assert.ok(!/at Object|node_modules|\/Users\//.test(text), 'no stack or path detail reaches the client');
+test('a malformed body is a 400 and an oversized one a 413 — not a 500', async () => {
+  const malformed = await call('/messages', { method: 'POST', raw: '{ not json' });
+  assert.equal(malformed.status, 400);
+  assert.equal((await malformed.json()).error, 'malformed_json');
+
+  const huge = await call('/messages', { method: 'POST', raw: JSON.stringify({ body: 'x'.repeat(7 * 1024 * 1024) }) });
+  assert.equal(huge.status, 413);
+  const text = await huge.text();
+  assert.ok(!/node_modules|\/Users\/|at Object/.test(text), 'no stack or path detail reaches the client');
+});
+
+test('a repeated query parameter is handled, not a 500', async () => {
+  assert.equal((await json('/people?group=microbiome-ml&group=comparative-genomics')).status, 200);
+  assert.equal((await json('/publications?year=2024&year=2025')).status, 200);
 });
 
 /* ------------------------------------------------------------- MESSAGES -- */
@@ -542,6 +588,134 @@ test('admin creation refuses incomplete records', async () => {
   const token = await signIn('admin@genomika.mk');
   assert.equal((await json('/admin/publications', { token, method: 'POST', body: { authors: 'X' } })).status, 400);
   assert.equal((await json('/admin/news', { token, method: 'POST', body: { title_en: 'Only English' } })).status, 400);
+});
+
+/* --------------------------------------------------------- PROTECTIONS -- */
+
+test('public write endpoints are rate limited per client', async () => {
+  const ip = '203.0.113.90';
+  const send = () => json('/messages', { ip, method: 'POST',
+    body: { name: 'Rate Tester', email: 'rate@example.mk', subject: 'Limit check', body: 'A message long enough to be accepted by validation.' } });
+  let limitedAt = null;
+  for (let i = 1; i <= 15 && !limitedAt; i++) if ((await send()).status === 429) limitedAt = i;
+  assert.ok(limitedAt && limitedAt <= 11, `limited by the eleventh message (at ${limitedAt})`);
+  // Another client is unaffected.
+  assert.equal((await json('/messages', { method: 'POST',
+    body: { name: 'Other Client', email: 'other@example.mk', subject: 'Unaffected', body: 'A message long enough to be accepted by validation.' } })).status, 201);
+});
+
+test('free-text fields are length-capped', async () => {
+  const long = await json('/messages', { method: 'POST',
+    body: { name: 'N'.repeat(500), email: 'cap@example.mk', subject: 'S'.repeat(500), body: 'A message long enough to be accepted by validation.' } });
+  assert.equal(long.status, 400);
+  assert.equal(long.body.fields.name, 'too_long');
+  assert.equal(long.body.fields.subject, 'too_long');
+});
+
+test('a booking date must be a real calendar date within the booking horizon', async () => {
+  const token = await signIn('n.avramovski@genomika.mk');
+  const book = (date, start_hour = 9, end_hour = 10) => json('/bookings', { token, method: 'POST',
+    body: { instrument_slug: 'qpcr-station', date, start_hour, end_hour } });
+  assert.equal((await book('2099-99-99')).body.error, 'invalid_date');
+  assert.equal((await book('2026-02-30')).body.error, 'invalid_date');
+  assert.equal((await book('9999-12-31')).body.error, 'too_far_ahead');
+  assert.equal((await json('/instruments/qpcr-station/availability?date=2026-13-01')).status, 400);
+});
+
+test('an hour that has already started today cannot be booked', async () => {
+  const token = await signIn('n.avramovski@genomika.mk');
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const hour = now.getHours();
+  // The HPC cluster is open around the clock, so the current hour is always in range.
+  const { body } = await json('/bookings', { token, method: 'POST',
+    body: { instrument_slug: 'hpc-cluster', date: today, start_hour: hour, end_hour: hour + 1 } });
+  assert.equal(body.error, hour + 1 > 24 ? 'outside_opening_hours' : 'date_in_past');
+});
+
+test('a booking that has already ended cannot be cancelled', async () => {
+  const token = await signIn('n.avramovski@genomika.mk');
+  const me = (await json('/auth/me', { token })).body.user;
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+  const date = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+  const { lastInsertRowid: id } = db.prepare(
+    `INSERT INTO bookings (instrument_id,user_id,user_name,user_email,date,start_hour,end_hour,purpose,status)
+     VALUES ((SELECT id FROM instruments WHERE slug = 'qpcr-station'),?,?,?,?,9,10,'finished run','confirmed')`
+  ).run(me.id, 'Nikola Avramovski', me.email, date);
+
+  const res = await json(`/bookings/${id}`, { token, method: 'DELETE' });
+  assert.equal(res.status, 409);
+  assert.equal(res.body.error, 'booking_finished');
+});
+
+test('availability marks the hours that can no longer be booked', async () => {
+  const now = new Date();
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+  const tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1);
+
+  const today = (await json(`/instruments/hpc-cluster/availability?date=${iso(now)}`)).body.slots;
+  today.forEach(s => assert.equal(s.past, s.hour <= now.getHours(), `hour ${s.hour} today`));
+  assert.ok((await json(`/instruments/hpc-cluster/availability?date=${iso(yesterday)}`)).body.slots.every(s => s.past));
+  assert.ok((await json(`/instruments/hpc-cluster/availability?date=${iso(tomorrow)}`)).body.slots.every(s => !s.past));
+});
+
+test('one person cannot hold more than twenty upcoming bookings', async () => {
+  const token = await signIn('s.jovanoska@genomika.mk');
+  let refused = null;
+  for (let day = 30; day < 60 && !refused; day++) {
+    const { status, body } = await json('/bookings', { token, method: 'POST',
+      body: { instrument_slug: 'visualisation-wall', date: dayFromNow(day), start_hour: 9, end_hour: 10 } });
+    if (status === 409) refused = body.error;
+  }
+  assert.equal(refused, 'quota_exceeded');
+});
+
+test('administrative writes validate every field instead of storing what they are sent', async () => {
+  const token = await signIn('admin@genomika.mk');
+  const id = (await json('/publications?limit=1')).body.items[0].id;
+  const put = (body) => json(`/admin/publications/${id}`, { token, method: 'PUT', body });
+
+  assert.equal((await put({ year: 'not a year' })).body.fields.year, 'not_an_integer');
+  assert.equal((await put({ title: null })).body.fields.title, 'required');
+  assert.equal((await put({ type: 'novel' })).body.fields.type, 'not_allowed');
+  assert.equal((await put({ group_id: 999 })).body.fields.group_id, 'does_not_exist');
+  assert.equal((await put({ open_access: true })).status, 200, 'a real boolean is accepted');
+
+  const stored = db.prepare('SELECT year, open_access FROM publications WHERE id = ?').get(id);
+  assert.equal(typeof stored.year, 'number', 'the integer column still holds an integer');
+  assert.equal(stored.open_access, 1);
+
+  const unknown = await put({ citations: 3, not_a_column: 'x' });
+  assert.equal(unknown.status, 200, 'unknown fields are ignored, not written');
+});
+
+test('renaming a news item onto a taken slug is a conflict, not a crash', async () => {
+  const token = await signIn('admin@genomika.mk');
+  const [a, b] = (await json('/news')).body;
+  const res = await json(`/admin/news/${a.id}`, { token, method: 'PUT', body: { slug: b.slug } });
+  assert.equal(res.status, 409);
+  assert.equal(res.body.error, 'slug_taken');
+});
+
+test('project status follows from its dates rather than a stored value', async () => {
+  const projects = (await json('/projects')).body;
+  const today = new Date().toISOString().slice(0, 10);
+  for (const p of projects) {
+    const expected = today < p.start_date ? 'planned' : today > p.end_date ? 'completed' : 'active';
+    assert.equal(p.status, expected, `${p.slug}: ${p.start_date} → ${p.end_date}`);
+  }
+});
+
+test('a position past its deadline is closed even if its flag says open', async () => {
+  const slug = 'rse-webtools';
+  db.prepare("UPDATE positions SET deadline = '2020-01-01', is_open = 1 WHERE slug = ?").run(slug);
+  const listed = (await json('/positions')).body.find(p => p.slug === slug);
+  assert.equal(listed.is_open, 0);
+  const apply = await json(`/positions/${slug}/apply`, { method: 'POST',
+    body: { name: 'Late Applicant', email: 'late@example.mk', motivation: 'A motivation letter comfortably past the minimum length requirement.' } });
+  assert.equal(apply.status, 409);
+  assert.equal(apply.body.error, 'position_closed');
 });
 
 /* --------------------------------------------------------------- SHAPE -- */

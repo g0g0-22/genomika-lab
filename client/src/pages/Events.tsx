@@ -26,7 +26,7 @@ function Rsvp({ event, onDone }: { event: Event; onDone: () => void }) {
       setState('done');
       onDone();
     } catch (err) {
-      const code = err instanceof ApiError ? err.code : 'error';
+      const code = err instanceof ApiError ? (err.status === 429 ? 'too_many' : err.code) : 'error';
       setError(code);
       setState('idle');
     }
@@ -48,6 +48,8 @@ function Rsvp({ event, onDone }: { event: Event; onDone: () => void }) {
           <Notice kind="error">
             {error === 'already_registered' ? t('ev.err.already_registered')
               : error === 'event_full' ? t('ev.err.event_full')
+              : error === 'event_past' ? t('ev.err.event_past')
+              : error === 'too_many' ? t('err.toomany')
               : t('common.error')}
           </Notice>
         </div>
@@ -57,7 +59,7 @@ function Rsvp({ event, onDone }: { event: Event; onDone: () => void }) {
 }
 
 export default function Events() {
-  const { t, f, s, formatDate } = useLang();
+  const { t, f, s, lang, formatDate } = useLang();
   const [scope, setScope] = useState('upcoming');
   const [open, setOpen] = useState<number | null>(null);
   const events = useFetch<Event[]>(`/events?scope=${scope}`, [scope]);
@@ -108,7 +110,8 @@ export default function Events() {
                 </div>
 
                 <div className="md:border-l md:border-line md:pl-6 flex flex-col gap-3">
-                  <div>
+                  {/* Seats only mean something for an event that has not happened yet. */}
+                  {scope === 'upcoming' && <div>
                     <Label>{t('ev.seats')}</Label>
                     <div className={`num text-2xl mt-1 ${seats <= 0 ? 'text-danger' : ''}`}>
                       {Math.max(seats, 0)}
@@ -118,7 +121,7 @@ export default function Events() {
                       <div className="h-full bg-accent rounded-[3px] transition-[width] duration-700"
                            style={{ width: `${Math.min((event.rsvp_count / event.capacity) * 100, 100)}%` }} />
                     </div>
-                  </div>
+                  </div>}
 
                   {scope === 'upcoming' && (
                     <>
@@ -129,7 +132,7 @@ export default function Events() {
                       >
                         {seats <= 0 ? t('ev.full') : open === event.id ? t('common.close') : t('ev.rsvp')}
                       </button>
-                      <a className="btn btn-sm justify-center" href={`/api/events/${event.id}/ics`}>
+                      <a className="btn btn-sm justify-center" href={`/api/events/${event.id}/ics?lang=${lang}`}>
                         {t('ev.ics')}
                       </a>
                     </>

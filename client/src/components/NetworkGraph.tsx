@@ -47,59 +47,28 @@ export function NetworkGraph({ nodes, links, height = 520 }: {
 
   useEffect(() => {
     if (sim.length === 0) return;
-    let alpha = 1;
 
-    const tick = () => {
+    // With reduced motion requested the layout is settled in one go, inside a
+    // single state update, and shown already at rest.
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
       setSim(current => {
-        const next = current.map(n => ({ ...n }));
-        const byId = new Map(next.map(n => [n.id, n]));
-
-        // repulsion
-        for (let i = 0; i < next.length; i++) {
-          for (let j = i + 1; j < next.length; j++) {
-            const a = next[i], b = next[j];
-            let dx = b.x - a.x, dy = b.y - a.y;
-            let distance = Math.hypot(dx, dy) || 0.01;
-            if (distance > 320) continue;
-            const force = (2600 / (distance * distance)) * alpha;
-            dx /= distance; dy /= distance;
-            a.vx -= dx * force; a.vy -= dy * force;
-            b.vx += dx * force; b.vy += dy * force;
-          }
-        }
-
-        // springs
-        for (const link of links) {
-          const a = byId.get(link.source), b = byId.get(link.target);
-          if (!a || !b) continue;
-          const dx = b.x - a.x, dy = b.y - a.y;
-          const distance = Math.hypot(dx, dy) || 0.01;
-          const rest = link.kind === 'coauthor' ? 130 : 96;
-          const force = ((distance - rest) * 0.012 * Math.min(link.weight, 4)) * alpha;
-          const ux = dx / distance, uy = dy / distance;
-          a.vx += ux * force; a.vy += uy * force;
-          b.vx -= ux * force; b.vy -= uy * force;
-        }
-
-        // centring + integration
-        for (const node of next) {
-          if (node.fixed) { node.vx = 0; node.vy = 0; continue; }
-          node.vx += (width / 2 - node.x) * 0.0022 * alpha;
-          node.vy += (height / 2 - node.y) * 0.0022 * alpha;
-          node.vx *= 0.82; node.vy *= 0.82;
-          node.x = Math.min(Math.max(node.x + node.vx, 30), width - 30);
-          node.y = Math.min(Math.max(node.y + node.vy, 26), height - 26);
-        }
-        return next;
+        let nodes = current;
+        for (let alpha = 1; alpha > 0.02; alpha *= 0.994) nodes = step(nodes, links, alpha, width, height);
+        return nodes;
       });
+      return;
+    }
 
+    let alpha = 1;
+    const tick = () => {
+      const strength = alpha;
+      setSim(current => step(current, links, strength, width, height));
       alpha *= 0.994;
       if (alpha > 0.02) frame.current = requestAnimationFrame(tick);
     };
-
     frame.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run only when the graph itself changes
   }, [sim.length, links]);
 
   const toSvg = (event: React.PointerEvent) => {
@@ -210,6 +179,51 @@ export function NetworkGraph({ nodes, links, height = 520 }: {
       </div>
     </div>
   );
+}
+
+/**
+ * One step of the simulation, as a pure function of the current positions.
+ * Repulsion pushes every pair apart, links pull their ends together, and a
+ * weak force draws everything to the centre; `alpha` cools all three.
+ */
+function step(current: Sim[], links: GraphLink[], alpha: number, width: number, height: number): Sim[] {
+  const next = current.map(n => ({ ...n }));
+  const byId = new Map(next.map(n => [n.id, n]));
+
+  for (let i = 0; i < next.length; i++) {
+    for (let j = i + 1; j < next.length; j++) {
+      const a = next[i], b = next[j];
+      let dx = b.x - a.x, dy = b.y - a.y;
+      const distance = Math.hypot(dx, dy) || 0.01;
+      if (distance > 320) continue;
+      const force = (2600 / (distance * distance)) * alpha;
+      dx /= distance; dy /= distance;
+      a.vx -= dx * force; a.vy -= dy * force;
+      b.vx += dx * force; b.vy += dy * force;
+    }
+  }
+
+  for (const link of links) {
+    const a = byId.get(link.source), b = byId.get(link.target);
+    if (!a || !b) continue;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const distance = Math.hypot(dx, dy) || 0.01;
+    const rest = link.kind === 'coauthor' ? 130 : 96;
+    const force = ((distance - rest) * 0.012 * Math.min(link.weight, 4)) * alpha;
+    const ux = dx / distance, uy = dy / distance;
+    a.vx += ux * force; a.vy += uy * force;
+    b.vx -= ux * force; b.vy -= uy * force;
+  }
+
+  for (const node of next) {
+    if (node.fixed) { node.vx = 0; node.vy = 0; continue; }
+    node.vx += (width / 2 - node.x) * 0.0022 * alpha;
+    node.vy += (height / 2 - node.y) * 0.0022 * alpha;
+    node.vx *= 0.82; node.vy *= 0.82;
+    node.x = Math.min(Math.max(node.x + node.vx, 30), width - 30);
+    node.y = Math.min(Math.max(node.y + node.vy, 26), height - 26);
+  }
+  return next;
 }
 
 /* ----------------------------------------------------------- PARTNER MAP */

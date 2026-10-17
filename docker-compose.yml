@@ -26,6 +26,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
+      TZ: Europe/Skopje
       PORT: 4000
       DB_PATH: /data/genomika.db
       UPLOAD_DIR: /data/uploads

@@ -50,6 +50,16 @@ export function cleanSequence(raw: string, alphabet = DNA_ALPHABET) {
   return { seq: kept, dropped };
 }
 
+/**
+ * Classifies raw input before any alphabet cleaning. Cleaning with the DNA
+ * alphabet first turned a pasted protein into a short, meaningless "DNA"
+ * string, so the protein case could never be detected.
+ */
+export function classifyInput(raw: string): SeqKind {
+  const letters = raw.toUpperCase().replace(/[^A-Z*]/g, '');
+  return detectKind(letters);
+}
+
 /** Best-effort guess of what kind of sequence a string holds. */
 export function detectKind(seq: string): SeqKind {
   if (!seq) return 'unknown';
@@ -67,7 +77,16 @@ const COMPLEMENT: Record<string, string> = {
   B: 'V', V: 'B', D: 'H', H: 'D'
 };
 
-export const complement = (seq: string) => seq.split('').map(c => COMPLEMENT[c] ?? 'N').join('');
+const isRna = (seq: string) => seq.includes('U') && !seq.includes('T');
+
+/** The complement in the strand's own alphabet: RNA pairs A with U, not T. */
+export const complement = (seq: string) => {
+  const rna = isRna(seq);
+  return seq.split('').map(c => {
+    const base = COMPLEMENT[c] ?? 'N';
+    return rna && base === 'T' ? 'U' : base;
+  }).join('');
+};
 export const reverse = (seq: string) => seq.split('').reverse().join('');
 export const reverseComplement = (seq: string) => reverse(complement(seq));
 export const transcribe = (seq: string) => seq.replace(/T/g, 'U');
@@ -105,6 +124,16 @@ export function gcContent(seq: string) {
 const DNA_RESIDUE_MASS: Record<string, number> = { A: 313.21, T: 304.20, G: 329.21, C: 289.18, N: 308.95 };
 const RNA_RESIDUE_MASS: Record<string, number> = { A: 329.21, U: 306.17, G: 345.21, C: 305.18, N: 321.44 };
 
+export function molecularWeight(seq: string) {
+  if (!seq.length) return 0;
+  const table = isRna(seq) ? RNA_RESIDUE_MASS : DNA_RESIDUE_MASS;
+  const other = table === RNA_RESIDUE_MASS ? DNA_RESIDUE_MASS : RNA_RESIDUE_MASS;
+  // A mixed strand is malformed, but a residue the main table lacks (U in a DNA
+  // strand) still weighs something — previously it counted as zero.
+  const total = seq.split('').reduce((sum, ch) => sum + (table[ch] ?? other[ch] ?? 0), 0);
+  return total - 61.96;
+}
+
 /**
  * Mass in the unit a person would expect to read it in. Rounding everything to
  * whole kilodaltons made a 12-mer read "4 kDa" and a primer read "0 kDa" —
@@ -116,17 +145,6 @@ export function formatMass(daltons: number): { value: number; unit: 'Da' | 'kDa'
     : { value: daltons / 1000, unit: 'kDa', digits: 2 };
 }
 
-export function molecularWeight(seq: string) {
-  if (!seq.length) return 0;
-  const table = seq.includes('U') && !seq.includes('T') ? RNA_RESIDUE_MASS : DNA_RESIDUE_MASS;
-  const total = seq.split('').reduce((sum, ch) => sum + (table[ch] ?? 0), 0);
-  return total - 61.96;
-}
-
-/**
- * Melting temperature. Under 14 bases the Wallace rule applies; above it the
- * GC-based formula gives a far better estimate.
- */
 /**
  * Both formulas are oligonucleotide estimates. Past roughly fifty bases the
  * GC formula stops describing anything physical — a gene does not melt at a
@@ -135,6 +153,10 @@ export function molecularWeight(seq: string) {
 export const TM_MAX_LENGTH = 50;
 export const meltingTempApplies = (seq: string) => seq.length > 0 && seq.length <= TM_MAX_LENGTH;
 
+/**
+ * Melting temperature. Under 14 bases the Wallace rule applies; above it the
+ * GC-based formula gives a far better estimate.
+ */
 export function meltingTemp(seq: string) {
   const n = seq.length;
   if (!n) return 0;
@@ -178,14 +200,16 @@ export function translate(seq: string, frame = 0) {
   return protein;
 }
 
+/**
+ * The six reading frames in the order every reference tool lists them:
+ * +1, +2, +3 on the given strand, then -1, -2, -3 on its reverse complement.
+ */
 export function translateAllFrames(seq: string) {
   const rc = reverseComplement(backTranscribe(seq));
-  return [0, 1, 2]
-    .flatMap(f => [
-      { frame: f + 1, strand: '+' as const, protein: translate(seq, f) },
-      { frame: -(f + 1), strand: '-' as const, protein: translate(rc, f) }
-    ])
-    .sort((a, b) => b.frame - a.frame);
+  return [
+    ...[0, 1, 2].map(f => ({ frame: f + 1, strand: '+' as const, protein: translate(seq, f) })),
+    ...[0, 1, 2].map(f => ({ frame: -(f + 1), strand: '-' as const, protein: translate(rc, f) }))
+  ];
 }
 
 export type Orf = {

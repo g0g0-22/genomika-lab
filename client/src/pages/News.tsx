@@ -22,9 +22,9 @@ export default function News() {
     <>
       <PageHeader index="07 / NEWS" title={t('news.title')} lead={t('news.lead')}>
         <div className="flex flex-wrap gap-1.5">
-          <button className={`chip ${!tag ? 'chip-on' : ''}`} onClick={() => setTag('')}>{t('common.all')}</button>
+          <button type="button" aria-pressed={!tag} className={`chip ${!tag ? 'chip-on' : ''}`} onClick={() => setTag('')}>{t('common.all')}</button>
           {tags.map(x => (
-            <button key={x} className={`chip ${tag === x ? 'chip-on' : ''}`} onClick={() => setTag(x)}>
+            <button key={x} type="button" aria-pressed={tag === x} className={`chip ${tag === x ? 'chip-on' : ''}`} onClick={() => setTag(x)}>
               {t(`news.tag.${x}` as any)}
             </button>
           ))}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLang } from '../i18n';
 import { useFetch } from '../lib/useFetch';
-import { post, ApiError } from '../lib/api';
+import { post, ApiError, fieldError } from '../lib/api';
 import { PageHeader, Card, Label, Loading, ErrorBox, Empty, Field, Notice, accentVar } from '../components/ui';
 
 type Position = {
@@ -27,8 +27,9 @@ function ApplicationForm({ position }: { position: Position }) {
 
   const readCv = (file: File | undefined) => {
     if (!file) { setCv(null); return; }
-    if (file.size > MAX_CV_BYTES) { setErrors(e => ({ ...e, cv: t('car.err.too_large') })); return; }
-    if (file.type && !ALLOWED.includes(file.type)) { setErrors(e => ({ ...e, cv: t('car.err.unsupported_type') })); return; }
+    // A refused file also drops whatever was attached before, so what is sent is what is shown.
+    if (file.size > MAX_CV_BYTES) { setCv(null); setErrors(e => ({ ...e, cv: 'too_large' })); return; }
+    if (!ALLOWED.includes(file.type)) { setCv(null); setErrors(e => ({ ...e, cv: 'unsupported_type' })); return; }
     const reader = new FileReader();
     reader.onload = () => {
       setErrors(e => ({ ...e, cv: '' }));
@@ -49,7 +50,7 @@ function ApplicationForm({ position }: { position: Position }) {
       if (err instanceof ApiError && err.fields) {
         setErrors(Object.fromEntries(Object.entries(err.fields).map(([k, v]) => [k, String(v)])));
       } else {
-        setErrors({ form: t('common.error') });
+        setErrors({ form: err instanceof ApiError && err.status === 429 ? t('err.toomany') : t('common.error') });
       }
       setState('idle');
     }
@@ -68,10 +69,10 @@ function ApplicationForm({ position }: { position: Position }) {
 
   return (
     <form onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-2 rise">
-      <Field label={t('common.name')} required error={errors.name && t('common.error')}>
+      <Field label={t('common.name')} required error={fieldError(t, errors.name)}>
         <input className="input" value={name} onChange={e => setName(e.target.value)} required minLength={2} />
       </Field>
-      <Field label={t('common.email')} required error={errors.email && t('common.error')}>
+      <Field label={t('common.email')} required error={fieldError(t, errors.email)}>
         <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
       </Field>
 
@@ -80,7 +81,7 @@ function ApplicationForm({ position }: { position: Position }) {
           label={t('car.motivation')}
           required
           hint={`${motivation.length} ${t('common.chars')} · min 40`}
-          error={errors.motivation && t('common.error')}
+          error={fieldError(t, errors.motivation)}
         >
           <textarea
             className="input"
@@ -96,7 +97,7 @@ function ApplicationForm({ position }: { position: Position }) {
       </div>
 
       <div className="md:col-span-2">
-        <Field label={`${t('car.cv')} (${t('common.optional')})`} error={errors.cv || undefined}>
+        <Field label={`${t('car.cv')} (${t('common.optional')})`} error={fieldError(t, errors.cv)}>
           <div className="flex flex-wrap items-center gap-3">
             <input
               type="file"

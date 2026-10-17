@@ -1,7 +1,8 @@
 import { Link, useParams } from 'react-router-dom';
 import { useLang } from '../i18n';
 import { useFetch } from '../lib/useFetch';
-import { Card, Label, Loading, ErrorBox, Crumb, DnaStrip, accentVar } from '../components/ui';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { Card, Label, Loading, ErrorBox, NotFound, Crumb, DnaStrip, accentVar } from '../components/ui';
 
 type Detail = {
   id: number; slug: string; accent: string; founded: number;
@@ -16,8 +17,10 @@ export default function GroupDetail() {
   const { slug } = useParams();
   const { t, f, s, formatDate } = useLang();
   const { data, loading, error, reload } = useFetch<Detail>(`/groups/${slug}`, [slug]);
+  useDocumentTitle(data ? f(data, 'name') : null);
 
   if (loading) return <Loading />;
+  if (error === 'not_found') return <NotFound />;
   if (error || !data) return <ErrorBox onRetry={reload} />;
 
   const accent = accentVar(data.accent);
@@ -73,8 +76,7 @@ export default function GroupDetail() {
                       <div className="mt-2 flex items-center gap-3">
                         <span className="label">{pub.citations} {t('pub.citations')}</span>
                         {pub.doi && (
-                          <a href={`https://doi.org/${pub.doi}`} target="_blank" rel="noopener noreferrer"
-                             className="label text-accent link-underline">DOI</a>
+                          <span className="num text-[11px] text-muted" title={t('common.fictionalid')}>doi:{pub.doi}</span>
                         )}
                       </div>
                     </div>

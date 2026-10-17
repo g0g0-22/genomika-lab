@@ -40,10 +40,13 @@ function CsvTable({ csv }: { csv: string }) {
   );
 }
 
-const formatSize = (mb: number) => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(1)} MB`);
+const formatSize = (mb: number, format: (n: number, o?: Intl.NumberFormatOptions) => string) => {
+  const oneDecimal = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
+  return mb >= 1024 ? `${format(mb / 1024, oneDecimal)} GB` : `${format(mb, oneDecimal)} MB`;
+};
 
 export default function Datasets() {
-  const { t, f, formatNumber } = useLang();
+  const { t, f, lang, formatNumber } = useLang();
   const [query, setQuery] = useState('');
   const [license, setLicense] = useState('');
   const [open, setOpen] = useState<string | null>(null);
@@ -67,9 +70,9 @@ export default function Datasets() {
             aria-label={t('common.search')}
           />
           <div className="flex flex-wrap gap-1.5">
-            <button className={`chip ${!license ? 'chip-on' : ''}`} onClick={() => setLicense('')}>{t('common.all')}</button>
+            <button type="button" aria-pressed={!license} className={`chip ${!license ? 'chip-on' : ''}`} onClick={() => setLicense('')}>{t('common.all')}</button>
             {licenses.map(l => (
-              <button key={l} className={`chip ${license === l ? 'chip-on' : ''}`} onClick={() => setLicense(l)}>{l}</button>
+              <button key={l} type="button" aria-pressed={license === l} className={`chip ${license === l ? 'chip-on' : ''}`} onClick={() => setLicense(l)}>{l}</button>
             ))}
           </div>
         </div>
@@ -93,16 +96,15 @@ export default function Datasets() {
                 <p className="mt-3 text-[13.5px] leading-relaxed text-ink2">{f(dataset, 'description')}</p>
 
                 <div className="mt-5 flex flex-wrap items-center gap-2">
-                  <a className="btn btn-sm btn-primary" href={`/api/datasets/${dataset.slug}/download`}>
+                  <a className="btn btn-sm btn-primary" href={`/api/datasets/${dataset.slug}/download?lang=${lang}`}>
                     ↓ {t('data.downloadcsv')}
                   </a>
-                  <button className="btn btn-sm" onClick={() => setOpen(open === dataset.slug ? null : dataset.slug)}>
+                  <button type="button" className="btn btn-sm" onClick={() => setOpen(open === dataset.slug ? null : dataset.slug)}
+                          aria-expanded={open === dataset.slug} aria-controls={`preview-${dataset.slug}`}>
                     {open === dataset.slug ? t('common.close') : t('data.preview')}
                   </button>
                   {dataset.doi && (
-                    <a className="btn btn-sm" href={`https://doi.org/${dataset.doi}`} target="_blank" rel="noopener noreferrer">
-                      DOI ↗
-                    </a>
+                    <span className="num text-[11px] text-muted" title={t('common.fictionalid')}>doi:{dataset.doi}</span>
                   )}
                   <CopyButton text={dataset.doi} label="DOI" />
                 </div>
@@ -110,7 +112,7 @@ export default function Datasets() {
 
               <dl className="grid grid-cols-2 md:grid-cols-1 gap-3.5 md:border-l md:border-line md:pl-6">
                 {[
-                  [t('data.size'), formatSize(dataset.size_mb)],
+                  [t('data.size'), formatSize(dataset.size_mb, formatNumber)],
                   [t('data.rows'), formatNumber(dataset.rows_count ?? 0)],
                   [t('data.organism'), dataset.organism],
                   [t('data.downloads'), formatNumber(dataset.downloads)]
@@ -124,7 +126,7 @@ export default function Datasets() {
             </div>
 
             {open === dataset.slug && (
-              <div className="mt-6 rise">
+              <div id={`preview-${dataset.slug}`} className="mt-6 rise">
                 <p className="label mb-3">{t('data.previewnote')}</p>
                 <CsvTable csv={dataset.preview_csv} />
               </div>

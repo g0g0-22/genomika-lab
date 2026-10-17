@@ -16,18 +16,22 @@ export const JWT_SECRET = process.env.JWT_SECRET
 const TOKEN_TTL = '8h';
 
 /*
- * Credential guessing is throttled per address. bcryptjs is pure JavaScript and
- * compares synchronously, so an unthrottled login endpoint is both an open
- * guessing surface and a way to occupy the event loop with a single stream of
- * requests. The window is deliberately short — this protects the service, it is
- * not an account-lockout policy.
+ * Failed sign-ins are throttled per client address. bcryptjs compares
+ * synchronously, so an unthrottled endpoint is both a guessing surface and a
+ * way to occupy the event loop.
+ *
+ * The key is the client alone, never the account. Keying on the account let
+ * anyone lock any user out by failing their address eight times; keyed on the
+ * client, an attacker can only ever throttle themselves. This depends on
+ * `trust proxy` being set in app.js — behind nginx, req.ip is otherwise the
+ * proxy's own address and every visitor would share one counter.
  */
 const ATTEMPT_LIMIT = 8;
 const ATTEMPT_WINDOW_MS = 60_000;
 const attempts = new Map();
 
-export function throttleKey(req, email) {
-  return `${req.ip ?? 'unknown'}|${String(email || '').toLowerCase().trim()}`;
+export function throttleKey(req) {
+  return req.ip ?? 'unknown';
 }
 
 export function tooManyAttempts(key) {

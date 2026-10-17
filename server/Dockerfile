@@ -13,7 +13,11 @@ RUN npm ci --omit=dev
 
 # ---------------------------------------------------------------- runtime --
 FROM node:22-bookworm-slim AS runtime
+# The laboratory's own time zone. "Today" for a booking and the wall-clock time
+# of a seminar are Skopje ideas; left unset the container runs in UTC and every
+# seeded event time shows an hour or two late.
 ENV NODE_ENV=production \
+    TZ=Europe/Skopje \
     PORT=4000 \
     DB_PATH=/data/genomika.db \
     UPLOAD_DIR=/data/uploads

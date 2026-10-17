@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { db } from '../db.js';
+import { rateLimit, MAX, tooLong } from '../lib/limits.js';
+
+const registrations = rateLimit({ limit: 10, windowMs: 10 * 60_000 });
 
 export const events = Router();
 
@@ -27,14 +30,15 @@ events.get('/events/:id', (req, res) => {
   res.json(withCounts(row));
 });
 
-events.post('/events/:id/rsvp', (req, res) => {
+events.post('/events/:id/rsvp', registrations, (req, res) => {
   const event = db.prepare('SELECT * FROM events WHERE id = ?').get(req.params.id);
   if (!event) return res.status(404).json({ error: 'not_found' });
 
   const name = String(req.body?.name || '').trim();
   const email = String(req.body?.email || '').trim().toLowerCase();
-  if (name.length < 2) return res.status(400).json({ error: 'invalid_name' });
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'invalid_email' });
+  if (name.length < 2 || tooLong(name, MAX.name)) return res.status(400).json({ error: 'invalid_name' });
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || tooLong(email, MAX.email)) return res.status(400).json({ error: 'invalid_email' });
+  if (new Date(event.starts_at) < new Date()) return res.status(409).json({ error: 'event_past' });
 
   const taken = db.prepare('SELECT COUNT(*) n FROM rsvps WHERE event_id = ?').get(event.id).n;
   if (taken >= event.capacity) return res.status(409).json({ error: 'event_full' });
@@ -48,10 +52,28 @@ events.post('/events/:id/rsvp', (req, res) => {
   res.status(201).json({ ok: true, event_id: event.id, remaining: event.capacity - taken - 1 });
 });
 
+/** RFC 5545 folds content lines longer than 75 octets onto continuation lines. */
+function foldLine(line) {
+  const bytes = Buffer.from(line, 'utf8');
+  if (bytes.length <= 75) return line;
+  const parts = [];
+  let start = 0;
+  while (start < bytes.length) {
+    let end = Math.min(start + (parts.length ? 74 : 75), bytes.length);
+    while (end < bytes.length && (bytes[end] & 0xC0) === 0x80) end--;   // never split a UTF-8 character
+    parts.push(bytes.subarray(start, end).toString('utf8'));
+    start = end;
+  }
+  return parts.join('\r\n ');
+}
+
 /** Calendar export — a real .ics file any calendar app can import. */
 events.get('/events/:id/ics', (req, res) => {
   const e = db.prepare('SELECT * FROM events WHERE id = ?').get(req.params.id);
   if (!e) return res.status(404).json({ error: 'not_found' });
+  const lang = req.query.lang === 'mk' ? 'mk' : 'en';
+  // A location stored as "Македонски / English" is split to the requested side.
+  const location = e.location.includes(' / ') ? e.location.split(' / ')[lang === 'mk' ? 0 : 1] : e.location;
   // Stored values already carry a Z, so stripping separators yields the
   // UTC form iCalendar expects: 20261021T120000Z.
   const stamp = (s) => s.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
@@ -63,11 +85,11 @@ events.get('/events/:id/ics', (req, res) => {
     `DTSTAMP:${stamp(new Date().toISOString().slice(0, 19))}Z`,
     `DTSTART:${stamp(e.starts_at)}`,
     `DTEND:${stamp(e.ends_at)}`,
-    `SUMMARY:${escape(e.title_en)}`,
-    `DESCRIPTION:${escape(e.description_en)}`,
-    `LOCATION:${escape(e.location)}`,
+    `SUMMARY:${escape(e[`title_${lang}`])}`,
+    `DESCRIPTION:${escape(e[`description_${lang}`])}`,
+    `LOCATION:${escape(location)}`,
     'END:VEVENT', 'END:VCALENDAR'
-  ].join('\r\n');
+  ].map(foldLine).join('\r\n') + '\r\n';
   res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="genomika-event-${e.id}.ics"`);
   res.send(ics);

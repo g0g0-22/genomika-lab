@@ -19,7 +19,7 @@ content.get('/groups/:slug', (req, res) => {
   res.json({
     ...group,
     people: db.prepare('SELECT * FROM people WHERE group_id = ? ORDER BY joined_year').all(group.id),
-    projects: db.prepare('SELECT * FROM projects WHERE group_id = ? ORDER BY start_date DESC').all(group.id),
+    projects: db.prepare('SELECT * FROM projects_live WHERE group_id = ? ORDER BY start_date DESC').all(group.id),
     publications: db.prepare('SELECT * FROM publications WHERE group_id = ? ORDER BY year DESC, citations DESC').all(group.id)
   });
 });
@@ -46,7 +46,7 @@ content.get('/people/:slug', (req, res) => {
     publications: db.prepare(`SELECT pub.* FROM publications pub
       JOIN publication_authors pa ON pa.publication_id = pub.id
       WHERE pa.person_id = ? ORDER BY pub.year DESC`).all(person.id),
-    projects: db.prepare(`SELECT pr.*, pm.role AS member_role FROM projects pr
+    projects: db.prepare(`SELECT pr.*, pm.role AS member_role FROM projects_live pr
       JOIN project_members pm ON pm.project_id = pr.id
       WHERE pm.person_id = ? ORDER BY pr.start_date DESC`).all(person.id)
   });
@@ -56,7 +56,7 @@ content.get('/people/:slug', (req, res) => {
 content.get('/projects', (req, res) => {
   const { group, status } = req.query;
   let sql = `SELECT pr.*, g.slug AS group_slug, g.name_mk AS group_name_mk, g.name_en AS group_name_en, g.accent
-             FROM projects pr LEFT JOIN groups g ON g.id = pr.group_id WHERE 1=1`;
+             FROM projects_live pr LEFT JOIN groups g ON g.id = pr.group_id WHERE 1=1`;
   const params = [];
   if (group) { sql += ' AND g.slug = ?'; params.push(group); }
   if (status) { sql += ' AND pr.status = ?'; params.push(status); }
@@ -125,7 +125,10 @@ content.get('/datasets/:slug/download', (req, res) => {
   const row = db.prepare('SELECT * FROM datasets WHERE slug = ?').get(req.params.slug);
   if (!row) return res.status(404).json({ error: 'not_found' });
   db.prepare('UPDATE datasets SET downloads = downloads + 1 WHERE id = ?').run(row.id);
-  const header = `# ${row.title_en}\n# ${row.doi}  |  ${row.license}\n# Demonstration excerpt — GenomikaLab\n`;
+  const mk = req.query.lang === 'mk';
+  const header = mk
+    ? `# ${row.title_mk}\n# ${row.doi}  |  ${row.license}\n# Демонстрациски извадок — ГеномикаЛаб\n`
+    : `# ${row.title_en}\n# ${row.doi}  |  ${row.license}\n# Demonstration excerpt — GenomikaLab\n`;
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${row.slug}-excerpt.csv"`);
   res.send(header + (row.preview_csv || ''));
@@ -150,8 +153,8 @@ content.get('/metrics', (_req, res) => {
         (SELECT COUNT(*) FROM people) people,
         (SELECT COUNT(*) FROM publications) publications,
         (SELECT SUM(citations) FROM publications) citations,
-        (SELECT COUNT(*) FROM projects WHERE status='active') active_projects,
-        (SELECT SUM(budget_eur) FROM projects WHERE status='active') active_funding,
+        (SELECT COUNT(*) FROM projects_live WHERE status='active') active_projects,
+        (SELECT COALESCE(SUM(budget_eur), 0) FROM projects_live WHERE status='active') active_funding,
         (SELECT COUNT(*) FROM datasets) datasets,
         (SELECT SUM(downloads) FROM datasets) dataset_downloads,
         (SELECT COUNT(*) FROM partners) partners`).get(),
@@ -161,7 +164,7 @@ content.get('/metrics', (_req, res) => {
     openAccessShare: db.prepare('SELECT open_access, COUNT(*) n FROM publications GROUP BY open_access').all(),
     partners: db.prepare('SELECT * FROM partners ORDER BY joint_papers DESC').all(),
     funding: db.prepare(`SELECT slug, title_mk, title_en, funder, budget_eur, start_date, end_date, status
-                         FROM projects ORDER BY start_date`).all(),
+                         FROM projects_live ORDER BY start_date`).all(),
     topCited: db.prepare('SELECT title, year, venue, citations, doi FROM publications ORDER BY citations DESC LIMIT 5').all()
   });
 });
@@ -170,7 +173,7 @@ content.get('/metrics', (_req, res) => {
 content.get('/network', (_req, res) => {
   const people = db.prepare('SELECT id, slug, name_mk, name_en, hue, seniority, group_id FROM people').all();
   const groups = db.prepare('SELECT id, slug, name_mk, name_en, accent FROM groups').all();
-  const projects = db.prepare('SELECT id, slug, title_mk, title_en, group_id, status FROM projects').all();
+  const projects = db.prepare('SELECT id, slug, title_mk, title_en, group_id, status FROM projects_live').all();
 
   const nodes = [
     ...groups.map(g => ({ id: `g${g.id}`, kind: 'group', label_mk: g.name_mk, label_en: g.name_en, accent: g.accent, weight: 14 })),

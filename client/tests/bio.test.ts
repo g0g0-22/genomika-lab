@@ -1,10 +1,11 @@
 /**
- * Correctness tests for the algorithm library.
+ * Correctness tests for the algorithm library and the BibTeX export.
  *
- *   node --experimental-strip-types --test tests/
+ *   node --experimental-strip-types --test tests/bio.test.ts
  *
- * The alignment cases are the standard textbook examples, so the expected
- * numbers can be checked against any reference implementation.
+ * Expected values come from the biology rather than from the code: the
+ * beta-globin protein, EcoRI's recognition site, OligoCalc's masses. They can
+ * be checked against any reference implementation.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,10 +13,10 @@ import assert from 'node:assert/strict';
 import {
   reverseComplement, complement, transcribe, translate, translateAllFrames, findOrfs,
   gcContent, meltingTemp, molecularWeight, parseFasta, cleanSequence, detectKind, toFasta,
-  IUPAC_DNA_ALPHABET, formatMass, meltingTempApplies
+  IUPAC_DNA_ALPHABET, formatMass, meltingTempApplies, classifyInput
 } from '../src/lib/bio/sequence.ts';
 import { bibtexAuthors, latexEscape, toBibtex } from '../src/lib/bibtex.ts';
-import { ENZYMES, findCutSites, digest, migration, recognitionSequence } from '../src/lib/bio/enzymes.ts';
+import { ENZYMES, findCutSites, digest, migration, recognitionSequence, GEL_RANGES } from '../src/lib/bio/enzymes.ts';
 import { HBB_CDS, PLASMID_FRAGMENT } from '../src/lib/bio/samples.ts';
 
 /* ------------------------------------------------------------- sequence -- */
@@ -24,6 +25,24 @@ test('complement and reverse complement', () => {
   assert.equal(complement('ATGC'), 'TACG');
   assert.equal(reverseComplement('ATGC'), 'GCAT');
   assert.equal(reverseComplement(reverseComplement(HBB_CDS)), HBB_CDS);
+});
+
+test('the complement of RNA stays RNA', () => {
+  assert.equal(complement('AUGC'), 'UACG');
+  assert.equal(reverseComplement('AUGC'), 'GCAU');
+  assert.equal(complement('ATGC'), 'TACG', 'DNA is unchanged');
+});
+
+test('a stray residue from the other alphabet still has mass', () => {
+  // Previously U in a DNA strand weighed nothing, so ATGU equalled ATG.
+  assert.ok(molecularWeight('ATGU') > molecularWeight('ATG') + 290);
+});
+
+test('raw input is classified before alphabet cleaning', () => {
+  assert.equal(classifyInput(HBB_CDS), 'dna');
+  assert.equal(classifyInput('MVHLTPEEKSAVTALWGKVNVDEVGGEALGRLLVVYPWTQRFF'), 'protein');
+  // The bug: cleaning a protein with the DNA alphabet left a short "DNA" string.
+  assert.equal(detectKind(cleanSequence('MVHLTPEEKSAVTALWGKV').seq), 'dna');
 });
 
 test('transcription replaces T with U', () => {
@@ -106,10 +125,11 @@ test('sequence kind detection', () => {
   assert.equal(detectKind(translate(HBB_CDS).replace(/\*/g, '')), 'protein');
 });
 
-test('all six reading frames are produced', () => {
+test('all six reading frames are produced, in the conventional order', () => {
   const frames = translateAllFrames(HBB_CDS);
-  assert.equal(frames.length, 6);
-  assert.deepEqual(frames.map(f => f.frame), [3, 2, 1, -1, -2, -3]);
+  assert.deepEqual(frames.map(f => f.frame), [1, 2, 3, -1, -2, -3]);
+  assert.ok(frames[0].protein.startsWith('MVHLTPEEK'), 'frame +1 of a coding sequence is its protein');
+  assert.equal(frames[3].protein, translate(reverseComplement(HBB_CDS)));
 });
 
 test('the IUPAC alphabet survives cleaning when it is asked for', () => {
@@ -147,6 +167,34 @@ test('a circular digest conserves length and marks the fragment crossing the ori
   assert.ok(wrapping[0].end < wrapping[0].start, 'and it is the only one whose end precedes its start');
   fragments.filter(f => !f.wraps).forEach(f =>
     assert.ok(f.start <= f.end, 'every other fragment reads forwards'));
+});
+
+test('on a circle, a site straddling the origin is found', () => {
+  const eco = ENZYMES.filter(e => e.name === 'EcoRI');
+  // GAATTC split as "GA" at the end and "ATTC" at the start.
+  const seq = 'ATTC' + 'T'.repeat(200) + 'GA';
+  assert.equal(findCutSites(seq, eco, false).length, 0, 'a linear molecule has no such site');
+  const sites = findCutSites(seq, eco, true);
+  assert.equal(sites.length, 1);
+  assert.equal(sites[0].position, seq.length - 1, 'cut between G and A, one base before the end');
+});
+
+test('a single cut on a circle opens it into one wrapping fragment', () => {
+  const eco = ENZYMES.filter(e => e.name === 'EcoRI');
+  const seq = 'T'.repeat(100) + 'GAATTC' + 'T'.repeat(100);
+  const [fragment, ...rest] = digest(seq, findCutSites(seq, eco, true), true);
+  assert.equal(rest.length, 0);
+  assert.equal(fragment.length, seq.length);
+  assert.equal(fragment.wraps, true);
+  assert.ok(fragment.end < fragment.start);
+});
+
+test('a cut exactly at the origin does not wrap', () => {
+  const eco = ENZYMES.filter(e => e.name === 'EcoRI');
+  const seq = 'AATTC' + 'T'.repeat(200) + 'G';          // G^AATTC across the origin, cut at 0
+  const [fragment] = digest(seq, findCutSites(seq, eco, true), true);
+  assert.deepEqual({ start: fragment.start, end: fragment.end, wraps: fragment.wraps },
+                   { start: 1, end: seq.length, wraps: undefined });
 });
 
 test('a linear digest of the same sequence gives one more fragment than cuts', () => {
@@ -224,4 +272,14 @@ test('BibTeX entry type and venue field follow the publication type', () => {
   assert.match(toBibtex({ ...base, type: 'article' }), /^@article\{[\s\S]*journal = \{V\}/);
   assert.match(toBibtex({ ...base, type: 'conference' }), /^@inproceedings\{[\s\S]*booktitle = \{V\}/);
   assert.match(toBibtex({ ...base, type: 'preprint' }), /^@misc\{[\s\S]*howpublished = \{V\}/);
+});
+
+test('the gel example is a digest whose every fragment resolves on its gel', () => {
+  // Gel.tsx loads PvuII + NdeI on a 2 % gel; if the sample or the enzymes change,
+  // the example must still show bands rather than run-off notes.
+  const enzymes = ENZYMES.filter(e => e.name === 'PvuII' || e.name === 'NdeI');
+  const lengths = digest(PLASMID_FRAGMENT, findCutSites(PLASMID_FRAGMENT, enzymes)).map(f => f.length);
+  assert.deepEqual(lengths, [349, 191, 138, 122]);
+  const [min, max] = GEL_RANGES['2.0'];
+  assert.ok(lengths.every(l => l >= min && l <= max));
 });

@@ -69,21 +69,35 @@ export type CutSite = {
   overhang: Enzyme['overhang'];
 };
 
-/** Finds every recognition site of the given enzymes, overlaps included. */
-export function findCutSites(seq: string, enzymes: Enzyme[]): CutSite[] {
+/**
+ * Finds every recognition site of the given enzymes, overlaps included.
+ *
+ * On a circular molecule a site can straddle the origin — "GA" at the end of
+ * the sequence and "ATTC" at its start is a perfectly good EcoRI site. The
+ * scan therefore reads past the end by the length of the longest site, keeps
+ * only matches that begin inside the real sequence, and reports positions
+ * modulo the length.
+ */
+export function findCutSites(seq: string, enzymes: Enzyme[], circular = false): CutSite[] {
   const sites: CutSite[] = [];
+  const n = seq.length;
+  if (!n) return sites;
+  const longest = Math.max(0, ...enzymes.map(e => recognitionSequence(e).length));
+  const haystack = circular ? seq + seq.slice(0, Math.max(longest - 1, 0)) : seq;
+
   for (const enzyme of enzymes) {
     const regex = siteRegex(enzyme);
     const offset = cutOffset(enzyme);
     let m: RegExpExecArray | null;
-    while ((m = regex.exec(seq)) !== null) {
+    while ((m = regex.exec(haystack)) !== null) {
+      if (m.index >= n) break;                 // only sites that begin in the real sequence
       sites.push({
         enzyme: enzyme.name,
         siteStart: m.index,
-        position: m.index + offset,
+        position: circular ? (m.index + offset) % n : m.index + offset,
         overhang: enzyme.overhang
       });
-      regex.lastIndex = m.index + 1;   // allow overlapping sites
+      regex.lastIndex = m.index + 1;           // allow overlapping sites
     }
   }
   return sites.sort((a, b) => a.position - b.position);
@@ -120,20 +134,23 @@ export function digest(seq: string, sites: CutSite[], circular = false): Fragmen
   const fragments: Fragment[] = [];
 
   if (circular) {
+    // n cuts on a circle give n fragments. Each runs from just after one cut to
+    // the next; the one that passes the origin is flagged, and with a single
+    // cut the whole molecule is opened at that point.
+    const n = seq.length;
     for (let i = 0; i < unique.length; i++) {
       const from = unique[i];
       const to = unique[(i + 1) % unique.length];
-      const length = i === unique.length - 1
-        ? seq.length - from.position + to.position
-        : to.position - from.position;
-      const wraps = i === unique.length - 1 && unique.length > 1;
+      const length = ((to.position - from.position + n) % n) || n;
+      const start = from.position + 1;
+      const end = to.position === 0 ? n : to.position;
       fragments.push({
-        start: from.position + 1,
-        end: to.position === 0 ? seq.length : to.position,
+        start,
+        end,
         length,
         leftEnzyme: from.enzyme,
         rightEnzyme: to.enzyme,
-        ...(wraps ? { wraps: true } : {})
+        ...(end < start ? { wraps: true } : {})
       });
     }
     return fragments.sort((a, b) => b.length - a.length);

@@ -72,9 +72,9 @@ export default function Publications() {
           <div>
             <Label>{t('common.year')}</Label>
             <div className="flex flex-wrap gap-1.5 mt-2">
-              <button className={`chip ${!year ? 'chip-on' : ''}`} onClick={() => reset(() => setYear(''))}>{t('common.all')}</button>
+              <button type="button" aria-pressed={!year} className={`chip ${!year ? 'chip-on' : ''}`} onClick={() => reset(() => setYear(''))}>{t('common.all')}</button>
               {facets.data?.years.map(y => (
-                <button key={y.year} className={`chip ${year === String(y.year) ? 'chip-on' : ''}`}
+                <button key={y.year} type="button" aria-pressed={year === String(y.year)} className={`chip ${year === String(y.year) ? 'chip-on' : ''}`}
                         onClick={() => reset(() => setYear(String(y.year)))}>
                   {y.year} <span className="opacity-60">{y.n}</span>
                 </button>
@@ -85,9 +85,9 @@ export default function Publications() {
           <div>
             <Label>{t('common.group')}</Label>
             <div className="flex flex-wrap gap-1.5 mt-2">
-              <button className={`chip ${!group ? 'chip-on' : ''}`} onClick={() => reset(() => setGroup(''))}>{t('common.all')}</button>
+              <button type="button" aria-pressed={!group} className={`chip ${!group ? 'chip-on' : ''}`} onClick={() => reset(() => setGroup(''))}>{t('common.all')}</button>
               {groups.data?.map(g => (
-                <button key={g.slug} className={`chip ${group === g.slug ? 'chip-on' : ''}`}
+                <button key={g.slug} type="button" aria-pressed={group === g.slug} className={`chip ${group === g.slug ? 'chip-on' : ''}`}
                         style={group === g.slug ? { borderColor: accentVar(g.accent), color: accentVar(g.accent) } : undefined}
                         onClick={() => reset(() => setGroup(g.slug))}>
                   {f(g, 'name')}
@@ -99,9 +99,9 @@ export default function Publications() {
           <div>
             <Label>{t('common.type')}</Label>
             <div className="flex flex-wrap gap-1.5 mt-2">
-              <button className={`chip ${!type ? 'chip-on' : ''}`} onClick={() => reset(() => setType(''))}>{t('common.all')}</button>
+              <button type="button" aria-pressed={!type} className={`chip ${!type ? 'chip-on' : ''}`} onClick={() => reset(() => setType(''))}>{t('common.all')}</button>
               {facets.data?.types.map(x => (
-                <button key={x.type} className={`chip ${type === x.type ? 'chip-on' : ''}`}
+                <button key={x.type} type="button" aria-pressed={type === x.type} className={`chip ${type === x.type ? 'chip-on' : ''}`}
                         onClick={() => reset(() => setType(x.type))}>
                   {t(`pub.type.${x.type}` as any)}
                 </button>
@@ -142,8 +142,8 @@ export default function Publications() {
                   { value: 'title', label: t('pub.sort.title') }
                 ]}
               />
-              <button className="btn btn-sm" onClick={() => setOrder(o => (o === 'desc' ? 'asc' : 'desc'))}
-                      aria-label={t('common.sort')}>
+              <button type="button" className="btn btn-sm" onClick={() => setOrder(o => (o === 'desc' ? 'asc' : 'desc'))}
+                      aria-label={`${t('common.sort')}: ${t(order === 'desc' ? 'common.desc' : 'common.asc')}`}>
                 {order === 'desc' ? '↓' : '↑'}
               </button>
             </div>
@@ -175,11 +175,10 @@ export default function Publications() {
 
                   <div className="mt-4 flex flex-wrap items-center gap-2">
                     {pub.doi && (
-                      <a href={`https://doi.org/${pub.doi}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm">
-                        DOI ↗
-                      </a>
+                      <span className="num text-[11px] text-muted" title={t('common.fictionalid')}>doi:{pub.doi}</span>
                     )}
-                    <button className="btn btn-sm" onClick={() => setExpanded(expanded === pub.id ? null : pub.id)}>
+                    <button type="button" className="btn btn-sm" onClick={() => setExpanded(expanded === pub.id ? null : pub.id)}
+                            aria-expanded={expanded === pub.id} aria-controls={`bib-${pub.id}`}>
                       {t('pub.bibtex')}
                     </button>
                     {pub.keywords?.split(';').filter(Boolean).slice(0, 3).map(kw => (
@@ -188,7 +187,7 @@ export default function Publications() {
                   </div>
 
                   {expanded === pub.id && (
-                    <div className="mt-4 rise">
+                    <div id={`bib-${pub.id}`} className="mt-4 rise">
                       <pre className="seq card p-3.5 scroll-thin overflow-auto text-[11.5px] whitespace-pre">{toBibtex(pub)}</pre>
                       <div className="flex gap-2 mt-2">
                         <CopyButton text={toBibtex(pub)} />
@@ -204,7 +203,7 @@ export default function Publications() {
           </ul>
 
           {(result.data?.pages ?? 1) > 1 && (
-            <nav className="mt-10 flex items-center justify-center gap-3" aria-label="pagination">
+            <nav className="mt-10 flex items-center justify-center gap-3" aria-label={t('common.pagination')}>
               <button className="btn btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
                 ← {t('common.prev')}
               </button>

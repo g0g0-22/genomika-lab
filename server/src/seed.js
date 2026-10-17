@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { db, migrate } from './db.js';
+import { localDate } from './lib/dates.js';
 
 migrate();
 
@@ -35,7 +36,7 @@ const groupRows = [
     description_en: 'We study the relation between amino-acid sequence and three-dimensional protein structure. We build models for binding-site prediction and for stability assessment of engineered mutants.'
   },
   {
-    slug: 'microbiome-ml', accent: 'amber', founded: 2021,
+    slug: 'microbiome-ml', accent: 'rose', founded: 2021,
     name_mk: 'Микробиом и машинско учење',
     name_en: 'Microbiome & Machine Learning',
     tagline_mk: 'Екосистеми премали за да се видат, премногу важни за да се игнорираат',
@@ -53,49 +54,49 @@ const G = Object.fromEntries(db.prepare('SELECT slug,id FROM groups').all().map(
 const peopleRows = [
   { slug:'ana-trajkovska', name_mk:'проф. д-р Ана Трајковска', name_en:'Prof. Ana Trajkovska',
     role_mk:'Директорка на лабораторијата', role_en:'Laboratory Director', seniority:'faculty',
-    group_id:G['comparative-genomics'], email:'a.trajkovska@genomika.mk', orcid:'0000-0002-1825-0097', github:'atrajkovska',
+    group_id:G['comparative-genomics'], email:'a.trajkovska@genomika.mk', orcid:'', github:'',
     interests:'филогеномика;структурни варијанти;алгоритми за порамнување', joined_year:2016, hue:96,
     bio_mk: 'Ана ја основала лабораторијата во 2016 година, по десет години работа во Европскиот институт за биоинформатика. Ја интересира како изборот на алгоритам влијае врз биолошките заклучоци — тема за која предава и на додипломски студии.',
     bio_en:'Ana founded the laboratory in 2016 after ten years at the European Bioinformatics Institute. Her interest is how algorithmic choice shapes biological conclusions — a topic she also teaches at undergraduate level.' },
   { slug:'marko-stefanovski', name_mk:'д-р Марко Стефановски', name_en:'Dr. Marko Stefanovski',
     role_mk:'Раководител на група', role_en:'Group Leader', seniority:'faculty',
-    group_id:G['comparative-genomics'], email:'m.stefanovski@genomika.mk', orcid:'0000-0001-5109-3700', github:'mstefanovski',
+    group_id:G['comparative-genomics'], email:'m.stefanovski@genomika.mk', orcid:'', github:'',
     interests:'структурни варијанти;long-read секвенционирање;графови на геноми', joined_year:2017, hue:86,
     bio_mk: 'Марко работи на пангеномски графови и откривање структурни варијанти со помош на долги отчитувања. Пред да се приклучи на лабораторијата, работел во областа на клиничката геномика во Загреб.',
     bio_en:'Marko works on pangenome graphs and structural-variant detection from long reads. Before joining he worked in clinical genomics in Zagreb.' },
   { slug:'elena-risteska', name_mk:'д-р Елена Ристеска', name_en:'Dr. Elena Risteska',
     role_mk:'Раководителка на група', role_en:'Group Leader', seniority:'faculty',
-    group_id:G['structural-bioinformatics'], email:'e.risteska@genomika.mk', orcid:'0000-0003-4321-8877', github:'eristeska',
+    group_id:G['structural-bioinformatics'], email:'e.risteska@genomika.mk', orcid:'', github:'',
     interests:'предвидување структура;молекуларна динамика;дизајн на протеини', joined_year:2018, hue:176,
     bio_mk: 'Елена ја води групата за структурна биоинформатика. Работи на методи за процена на термостабилноста на инженерски модифицирани ензими без потреба од скапи симулации.',
     bio_en:'Elena leads the structural bioinformatics group. She works on methods that assess the thermostability of engineered enzymes without requiring expensive simulations.' },
   { slug:'damjan-kovachevikj', name_mk:'д-р Дамјан Ковачевиќ', name_en:'Dr. Damjan Kovachevikj',
     role_mk:'Раководител на група', role_en:'Group Leader', seniority:'faculty',
-    group_id:G['microbiome-ml'], email:'d.kovachevikj@genomika.mk', orcid:'0000-0002-9987-1122', github:'dkova',
+    group_id:G['microbiome-ml'], email:'d.kovachevikj@genomika.mk', orcid:'', github:'',
     interests:'метагеномика;репрезентациско учење;еколошка статистика', joined_year:2021, hue:38,
     bio_mk: 'Дамјан ја поврзува микробната екологија со современото машинско учење. Тој го координира долгорочното следење на микробиомот на Охридското Езеро.',
     bio_en:'Damjan connects microbial ecology with modern machine learning. He coordinates the long-term monitoring of the Lake Ohrid microbiome.' },
   { slug:'ivana-petrushevska', name_mk:'д-р Ивана Петрушевска', name_en:'Dr. Ivana Petrushevska',
     role_mk:'Постдокторска истражувачка', role_en:'Postdoctoral Researcher', seniority:'postdoc',
-    group_id:G['structural-bioinformatics'], email:'i.petrushevska@genomika.mk', orcid:'0000-0001-7766-5511', github:'ipetrushevska',
+    group_id:G['structural-bioinformatics'], email:'i.petrushevska@genomika.mk', orcid:'', github:'',
     interests:'места за врзување;графовски невронски мрежи', joined_year:2022, hue:165,
     bio_mk: 'Ивана развива графовски невронски мрежи што ги предвидуваат активните места во ензимите на екстремофилните организми.',
     bio_en:'Ivana develops graph neural networks that predict active sites in enzymes from extremophile organisms.' },
   { slug:'nikola-avramovski', name_mk:'Никола Аврамовски', name_en:'Nikola Avramovski',
     role_mk:'Докторанд', role_en:'PhD Candidate', seniority:'phd',
-    group_id:G['comparative-genomics'], email:'n.avramovski@genomika.mk', orcid:'0009-0004-3311-2200', github:'navramovski',
+    group_id:G['comparative-genomics'], email:'n.avramovski@genomika.mk', orcid:'', github:'',
     interests:'порамнување на секвенци;SIMD оптимизација', joined_year:2022, hue:104,
     bio_mk: 'Никола работи на векторизирани имплементации на алгоритмот Smith–Waterman што се извршуваат директно во веб-прелистувач.',
     bio_en:'Nikola works on vectorised Smith–Waterman implementations that run directly inside a web browser.' },
   { slug:'sara-jovanoska', name_mk:'Сара Јованоска', name_en:'Sara Jovanoska',
     role_mk:'Докторандка', role_en:'PhD Candidate', seniority:'phd',
-    group_id:G['microbiome-ml'], email:'s.jovanoska@genomika.mk', orcid:'0009-0007-8899-1010', github:'sjovanoska',
+    group_id:G['microbiome-ml'], email:'s.jovanoska@genomika.mk', orcid:'', github:'',
     interests:'16S rRNA;диверзитет;биостатистика', joined_year:2023, hue:44,
     bio_mk: 'Сара ги анализира сезонските промени во микробните заедници и развива робусни мерки за разновидност кај мал број примероци.',
     bio_en:'Sara analyses seasonal shifts in microbial communities and works on robust diversity measures for small samples.' },
   { slug:'filip-micevski', name_mk:'Филип Мицевски', name_en:'Filip Micevski',
     role_mk:'Инженер за истражувачки софтвер', role_en:'Research Software Engineer', seniority:'staff',
-    group_id:G['comparative-genomics'], email:'f.micevski@genomika.mk', orcid:'', github:'fmicevski',
+    group_id:G['comparative-genomics'], email:'f.micevski@genomika.mk', orcid:'', github:'',
     interests:'веб-платформи;репродуцибилност;CI за наука', joined_year:2019, hue:120,
     bio_mk: 'Филип ги одржува сите алатки на оваа веб-страница. Верува дека истражувачки метод навистина постои само кога и други можат да го применат.',
     bio_en:'Filip maintains every tool you see on this site. He believes a research method does not exist until somebody else can run it.' },
@@ -107,7 +108,7 @@ const peopleRows = [
     bio_en:'Tamara makes sure the laboratory datasets stay findable, accessible and reusable.' },
   { slug:'bojan-naumovski', name_mk:'Бојан Наумовски', name_en:'Bojan Naumovski',
     role_mk:'Магистрант', role_en:'MSc Student', seniority:'msc',
-    group_id:G['structural-bioinformatics'], email:'b.naumovski@genomika.mk', orcid:'', github:'bnaumovski',
+    group_id:G['structural-bioinformatics'], email:'b.naumovski@genomika.mk', orcid:'', github:'',
     interests:'визуелизација на протеини;WebGL', joined_year:2024, hue:186,
     bio_mk: 'Бојан ја пишува магистерската теза за интерактивна визуелизација на конформациски ансамбли.',
     bio_en:'Bojan is writing his MSc thesis on interactive visualisation of conformational ensembles.' }
@@ -166,29 +167,34 @@ projectRows.forEach(p => {
 });
 
 /* ---------------------------------------------------------- PUBLICATIONS */
+/*
+ * Every identifier below is fictional. DOIs use 10.5555, the prefix Crossref
+ * reserves for testing, so none resolves to a real paper; people carry no
+ * ORCID or GitHub handle, because any plausible one belongs to someone real.
+ */
 const pubs = [
-  ['A graph pangenome of 120 endemic Balkan species reveals recurrent inversions','Trajkovska A, Stefanovski M, Avramovski N, Micevski F','Nature Communications',2025,'article','10.1038/s41467-025-48812-1',31,1,'comparative-genomics','pangenome;structural variants;inversion'],
-  ['Vectorised Smith–Waterman for the browser: WebAssembly SIMD in teaching contexts','Avramovski N, Micevski F, Trajkovska A','Bioinformatics',2025,'article','10.1093/bioinformatics/btaf221',18,1,'comparative-genomics','alignment;SIMD;education'],
-  ['Seasonal restructuring of the Lake Ohrid bacterioplankton community','Kovachevikj D, Jovanoska S, Gjorgjievska T','The ISME Journal',2025,'article','10.1038/s41396-025-01677-2',12,1,'microbiome-ml','metagenomics;limnology;diversity'],
-  ['Fast estimation of mutational free-energy change without molecular dynamics','Risteska E, Petrushevska I, Naumovski B','Protein Science',2025,'article','10.1002/pro.5109',9,1,'structural-bioinformatics','stability;ddG;enzyme design'],
-  ['Graph neural networks localise catalytic residues in extremophile enzymes','Petrushevska I, Risteska E','Journal of Chemical Information and Modeling',2024,'article','10.1021/acs.jcim.4c00873',44,1,'structural-bioinformatics','GNN;active site;extremophiles'],
-  ['Benchmarking long-read structural variant callers on highly repetitive plant genomes','Stefanovski M, Trajkovska A','Genome Biology',2024,'article','10.1186/s13059-024-03299-3',67,1,'comparative-genomics','long reads;benchmark;SV'],
-  ['Altitudinal gradients shape soil microbial diversity on Šar Mountain','Jovanoska S, Kovachevikj D','FEMS Microbiology Ecology',2024,'article','10.1093/femsec/fiae041',23,1,'microbiome-ml','soil;altitude;16S'],
-  ['Reproducible bioinformatics teaching with browser-native tools','Micevski F, Trajkovska A','PLOS Computational Biology',2024,'article','10.1371/journal.pcbi.1012044',29,1,'comparative-genomics','education;reproducibility'],
-  ['On the choice of gap penalties in pairwise protein alignment','Trajkovska A, Avramovski N','BMC Bioinformatics',2023,'article','10.1186/s12859-023-05412-y',52,1,'comparative-genomics','alignment;gap penalty'],
-  ['Conformational ensembles as first-class citizens in structure databases','Naumovski B, Risteska E','Structure',2023,'article','10.1016/j.str.2023.09.004',15,0,'structural-bioinformatics','ensembles;databases'],
-  ['A FAIR data workflow for small environmental genomics laboratories','Gjorgjievska T, Kovachevikj D','Scientific Data',2023,'article','10.1038/s41597-023-02455-x',38,1,'microbiome-ml','FAIR;metadata;workflow'],
-  ['Codon usage bias correlates with growth temperature across 4,300 prokaryotes','Kovachevikj D, Risteska E, Trajkovska A','Molecular Biology and Evolution',2023,'article','10.1093/molbev/msad187',81,1,'microbiome-ml','codon usage;thermophiles'],
-  ['UPGMA revisited: when simple clustering still wins','Avramovski N, Stefanovski M','Systematic Biology',2022,'article','10.1093/sysbio/syac055',26,0,'comparative-genomics','phylogenetics;UPGMA'],
-  ['Restriction site prediction as a teaching device for string algorithms','Micevski F','Journal of Open Source Education',2022,'article','10.21105/jose.00142',7,1,'comparative-genomics','education;string matching'],
-  ['Thermostability determinants in archaeal glycoside hydrolases','Risteska E, Petrushevska I','FEBS Journal',2022,'article','10.1111/febs.16544',49,1,'structural-bioinformatics','thermostability;archaea'],
-  ['Sampling depth and the illusion of microbial rarity','Jovanoska S, Gjorgjievska T, Kovachevikj D','Environmental Microbiology',2022,'article','10.1111/1462-2920.16077',33,1,'microbiome-ml','rarefaction;sampling'],
-  ['Hidden Markov models for prokaryotic gene finding: a practical reassessment','Stefanovski M','NAR Genomics and Bioinformatics',2021,'article','10.1093/nargab/lqab092',41,1,'comparative-genomics','HMM;gene finding'],
-  ['GenomikaLab at ISMB 2021: browser-side genomics','Trajkovska A, Micevski F','ISMB Proceedings',2021,'conference','10.5281/zenodo.5125533',5,1,'comparative-genomics','conference;demo'],
-  ['Sequence logos considered harmful for low-complexity regions','Petrushevska I','Bioinformatics Advances',2021,'article','10.1093/bioadv/vbab019',19,1,'structural-bioinformatics','sequence logo;visualisation'],
-  ['An open protocol for monthly limnological metagenomic sampling','Gjorgjievska T, Jovanoska S','protocols.io',2021,'preprint','10.17504/protocols.io.bvj2n4qe',11,1,'microbiome-ml','protocol;sampling'],
-  ['Phylogenetic signal in mitochondrial genomes of Balkan cave fauna','Trajkovska A, Stefanovski M','Molecular Phylogenetics and Evolution',2020,'article','10.1016/j.ympev.2020.106877',73,0,'comparative-genomics','phylogenetics;cave fauna'],
-  ['Teaching dynamic programming through biological sequence alignment','Trajkovska A','ACM SIGCSE',2019,'conference','10.1145/3287324.3287401',58,0,'comparative-genomics','education;dynamic programming']
+  ['A graph pangenome of 120 endemic Balkan species reveals recurrent inversions','Trajkovska A, Stefanovski M, Avramovski N, Micevski F','Nature Communications',2025,'article','10.5555/genomika.pub.001',31,1,'comparative-genomics','pangenome;structural variants;inversion'],
+  ['Vectorised Smith–Waterman for the browser: WebAssembly SIMD in teaching contexts','Avramovski N, Micevski F, Trajkovska A','Bioinformatics',2025,'article','10.5555/genomika.pub.002',18,1,'comparative-genomics','alignment;SIMD;education'],
+  ['Seasonal restructuring of the Lake Ohrid bacterioplankton community','Kovachevikj D, Jovanoska S, Gjorgjievska T','The ISME Journal',2025,'article','10.5555/genomika.pub.003',12,1,'microbiome-ml','metagenomics;limnology;diversity'],
+  ['Fast estimation of mutational free-energy change without molecular dynamics','Risteska E, Petrushevska I, Naumovski B','Protein Science',2025,'article','10.5555/genomika.pub.004',9,1,'structural-bioinformatics','stability;ddG;enzyme design'],
+  ['Graph neural networks localise catalytic residues in extremophile enzymes','Petrushevska I, Risteska E','Journal of Chemical Information and Modeling',2024,'article','10.5555/genomika.pub.005',44,1,'structural-bioinformatics','GNN;active site;extremophiles'],
+  ['Benchmarking long-read structural variant callers on highly repetitive plant genomes','Stefanovski M, Trajkovska A','Genome Biology',2024,'article','10.5555/genomika.pub.006',67,1,'comparative-genomics','long reads;benchmark;SV'],
+  ['Altitudinal gradients shape soil microbial diversity on Šar Mountain','Jovanoska S, Kovachevikj D','FEMS Microbiology Ecology',2024,'article','10.5555/genomika.pub.007',23,1,'microbiome-ml','soil;altitude;16S'],
+  ['Reproducible bioinformatics teaching with browser-native tools','Micevski F, Trajkovska A','PLOS Computational Biology',2024,'article','10.5555/genomika.pub.008',29,1,'comparative-genomics','education;reproducibility'],
+  ['On the choice of gap penalties in pairwise protein alignment','Trajkovska A, Avramovski N','BMC Bioinformatics',2023,'article','10.5555/genomika.pub.009',52,1,'comparative-genomics','alignment;gap penalty'],
+  ['Conformational ensembles as first-class citizens in structure databases','Naumovski B, Risteska E','Structure',2023,'article','10.5555/genomika.pub.010',15,0,'structural-bioinformatics','ensembles;databases'],
+  ['A FAIR data workflow for small environmental genomics laboratories','Gjorgjievska T, Kovachevikj D','Scientific Data',2023,'article','10.5555/genomika.pub.011',38,1,'microbiome-ml','FAIR;metadata;workflow'],
+  ['Codon usage bias correlates with growth temperature across 4,300 prokaryotes','Kovachevikj D, Risteska E, Trajkovska A','Molecular Biology and Evolution',2023,'article','10.5555/genomika.pub.012',81,1,'microbiome-ml','codon usage;thermophiles'],
+  ['UPGMA revisited: when simple clustering still wins','Avramovski N, Stefanovski M','Systematic Biology',2022,'article','10.5555/genomika.pub.013',26,0,'comparative-genomics','phylogenetics;UPGMA'],
+  ['Restriction site prediction as a teaching device for string algorithms','Micevski F','Journal of Open Source Education',2022,'article','10.5555/genomika.pub.014',7,1,'comparative-genomics','education;string matching'],
+  ['Thermostability determinants in archaeal glycoside hydrolases','Risteska E, Petrushevska I','FEBS Journal',2022,'article','10.5555/genomika.pub.015',49,1,'structural-bioinformatics','thermostability;archaea'],
+  ['Sampling depth and the illusion of microbial rarity','Jovanoska S, Gjorgjievska T, Kovachevikj D','Environmental Microbiology',2022,'article','10.5555/genomika.pub.016',33,1,'microbiome-ml','rarefaction;sampling'],
+  ['Hidden Markov models for prokaryotic gene finding: a practical reassessment','Stefanovski M','NAR Genomics and Bioinformatics',2021,'article','10.5555/genomika.pub.017',41,1,'comparative-genomics','HMM;gene finding'],
+  ['GenomikaLab at ISMB 2021: browser-side genomics','Trajkovska A, Micevski F','ISMB Proceedings',2021,'conference','10.5555/genomika.pub.018',5,1,'comparative-genomics','conference;demo'],
+  ['Sequence logos considered harmful for low-complexity regions','Petrushevska I','Bioinformatics Advances',2021,'article','10.5555/genomika.pub.019',19,1,'structural-bioinformatics','sequence logo;visualisation'],
+  ['An open protocol for monthly limnological metagenomic sampling','Gjorgjievska T, Jovanoska S','protocols.io',2021,'preprint','10.5555/genomika.pub.020',11,1,'microbiome-ml','protocol;sampling'],
+  ['Phylogenetic signal in mitochondrial genomes of Balkan cave fauna','Trajkovska A, Stefanovski M','Molecular Phylogenetics and Evolution',2020,'article','10.5555/genomika.pub.021',73,0,'comparative-genomics','phylogenetics;cave fauna'],
+  ['Teaching dynamic programming through biological sequence alignment','Trajkovska A','ACM SIGCSE',2019,'conference','10.5555/genomika.pub.022',58,0,'comparative-genomics','education;dynamic programming']
 ];
 const pubStmt = ins(`INSERT INTO publications (title,authors,venue,year,type,doi,citations,open_access,group_id,keywords,abstract)
   VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
@@ -211,35 +217,35 @@ pubs.forEach(p => {
 
 /* -------------------------------------------------------------- DATASETS */
 const datasets = [
-  { slug:'ohrid-16s-2023-2025', format:'FASTQ + TSV', size_mb:2840.5, license:'CC BY 4.0', year:2025, downloads:412, doi:'10.5281/zenodo.11220034', organism:'mixed bacterioplankton', rows_count:1440,
+  { slug:'ohrid-16s-2023-2025', format:'FASTQ + TSV', size_mb:2840.5, license:'CC BY 4.0', year:2025, downloads:412, doi:'10.5555/genomika.data.001', organism:'mixed bacterioplankton', rows_count:1440,
     title_mk:'16S rRNA профили на Охридското Езеро (2023–2025)', title_en:'Lake Ohrid 16S rRNA profiles (2023–2025)',
     description_mk: 'Месечни профили на 16S ампликонски секвенци од дванаесет точки на различни длабочини, со целосни метаподатоци за температурата, pH-вредноста и растворениот кислород.',
     description_en:'Monthly 16S amplicon profiles from twelve points at different depths, with full metadata for temperature, pH and dissolved oxygen.',
     preview_csv:'sample_id,date,depth_m,temp_c,ph,do_mg_l,shannon,observed_otus\nOHR-2401,2024-01-15,5,7.8,8.21,10.4,4.12,318\nOHR-2402,2024-01-15,30,6.9,8.17,9.8,3.87,286\nOHR-2403,2024-01-15,100,6.1,8.09,8.1,3.41,241\nOHR-2404,2024-02-14,5,7.2,8.24,10.9,4.05,309\nOHR-2405,2024-02-14,30,6.6,8.19,10.1,3.92,297\nOHR-2406,2024-02-14,100,6.0,8.11,8.4,3.38,238\nOHR-2407,2024-03-13,5,9.4,8.26,10.2,4.31,342\nOHR-2408,2024-03-13,30,7.1,8.20,9.6,3.99,301' },
-  { slug:'balkan-pangenome-v2', format:'GFA + VCF', size_mb:15420.0, license:'CC BY-SA 4.0', year:2025, downloads:187, doi:'10.5281/zenodo.11889201', organism:'120 endemic species', rows_count:120,
+  { slug:'balkan-pangenome-v2', format:'GFA + VCF', size_mb:15420.0, license:'CC BY-SA 4.0', year:2025, downloads:187, doi:'10.5555/genomika.data.002', organism:'120 endemic species', rows_count:120,
     title_mk:'Балкански пангеномски граф v2.0', title_en:'Balkan pangenome graph v2.0',
     description_mk: 'Графовска репрезентација на 120 геноми во формат GFA, придружена со датотека VCF со структурни варијанти идентификувани во однос на графот.',
     description_en:'Graph representation of 120 genomes in GFA format, accompanied by a VCF of structural variants called against the graph.',
     preview_csv:'species,assembly_n50_mb,genome_size_mb,contigs,sv_count,inversions\nProteus anguinus,18.4,2340,412,10422,318\nAstacus astacus,12.1,1810,688,8931,244\nSalmo letnica,9.7,1120,904,7712,201\nPelagonia orientalis,22.3,760,188,4021,96\nDinaromys bogdanovi,15.8,2510,502,11884,377' },
-  { slug:'shar-soil-transect', format:'CSV', size_mb:38.2, license:'CC0 1.0', year:2024, downloads:963, doi:'10.5281/zenodo.10553120', organism:'soil microbiome', rows_count:2160,
+  { slug:'shar-soil-transect', format:'CSV', size_mb:38.2, license:'CC0 1.0', year:2024, downloads:963, doi:'10.5555/genomika.data.003', organism:'soil microbiome', rows_count:2160,
     title_mk: 'Трансект на почвениот микробиом на Шар Планина', title_en:'Šar Mountain soil microbiome transect',
     description_mk: 'Метрики за разновидност и хемиски параметри на почвата за 2.160 примероци собрани долж висински градиент од 900 до 2.500 метри надморска височина.',
     description_en:'Diversity metrics and soil chemistry for 2160 samples collected along an altitudinal gradient from 900 to 2500 metres.',
     preview_csv:'site,altitude_m,ph,organic_c_pct,n_total_pct,shannon,chao1\nSAR-01,912,5.9,4.21,0.31,5.02,842\nSAR-02,1104,5.7,4.88,0.36,5.14,901\nSAR-03,1350,5.4,5.62,0.41,5.21,944\nSAR-04,1610,5.1,6.10,0.44,5.09,913\nSAR-05,1880,4.9,6.77,0.49,4.88,861\nSAR-06,2140,4.7,7.02,0.52,4.61,798\nSAR-07,2405,4.6,6.44,0.47,4.22,702' },
-  { slug:'thermostability-benchmark', format:'CSV + PDB', size_mb:512.7, license:'CC BY 4.0', year:2025, downloads:274, doi:'10.5281/zenodo.11704455', organism:'archaeal enzymes', rows_count:3841,
+  { slug:'thermostability-benchmark', format:'CSV + PDB', size_mb:512.7, license:'CC BY 4.0', year:2025, downloads:274, doi:'10.5555/genomika.data.004', organism:'archaeal enzymes', rows_count:3841,
     title_mk: 'Референтен тест за термостабилност при точкести мутации', title_en:'Point-mutation thermostability benchmark',
     description_mk: 'Експериментално измерени вредности на ΔΔG за 3.841 точкести мутации кај 44 археални ензими, заедно со соодветните структури.',
     description_en:'Experimentally measured ΔΔG values for 3841 point mutations across 44 archaeal enzymes, with accompanying structures.',
     preview_csv:'pdb_id,mutation,ddg_kcal_mol,temp_c,method,chain\n1AKY,A45V,-0.82,55,DSC,A\n1AKY,G78D,1.44,55,DSC,A\n3TIM,V12I,-1.10,60,CD,A\n3TIM,K57E,0.31,60,CD,A\n1LYZ,T40S,0.95,50,DSF,A\n1LYZ,I55L,-0.44,50,DSF,A' },
-  { slug:'codon-usage-4300', format:'TSV', size_mb:96.4, license:'CC BY 4.0', year:2023, downloads:1508, doi:'10.5281/zenodo.8123945', organism:'4300 prokaryotes', rows_count:4300,
+  { slug:'codon-usage-4300', format:'TSV', size_mb:96.4, license:'CC BY 4.0', year:2023, downloads:1508, doi:'10.5555/genomika.data.005', organism:'4300 prokaryotes', rows_count:4300,
     title_mk: 'Употреба на кодони кај 4.300 прокариоти', title_en:'Codon usage across 4300 prokaryotes',
     description_mk: 'Релативна употреба на кодони за секој геном, со наведена оптимална температура на раст за секој организам.',
     description_en:'Relative codon usage per genome, annotated with the optimal growth temperature of each organism.',
     preview_csv:'organism,domain,opt_growth_temp_c,gc_pct,cai_mean,enc\nThermus thermophilus,Bacteria,68,69.4,0.74,42.1\nEscherichia coli,Bacteria,37,50.8,0.68,52.3\nPyrococcus furiosus,Archaea,100,40.8,0.71,39.8\nBacillus subtilis,Bacteria,30,43.5,0.66,53.9\nMethanocaldococcus jannaschii,Archaea,85,31.4,0.69,41.2' },
-  { slug:'teaching-sequences', format:'FASTA', size_mb:1.2, license:'CC0 1.0', year:2024, downloads:3204, doi:'10.5281/zenodo.10998112', organism:'curated', rows_count:240,
+  { slug:'teaching-sequences', format:'FASTA', size_mb:1.2, license:'CC0 1.0', year:2024, downloads:3204, doi:'10.5555/genomika.data.006', organism:'curated', rows_count:240,
     title_mk:'Наставна збирка секвенци', title_en:'Teaching sequence collection',
-    description_mk: 'Мала, внимателно одбрана збирка од 240 нуклеотидни и протеински секвенци, избрани за да ги илустрираат класичните алгоритми на оваа веб-страница.',
-    description_en:'A small curated collection of 240 nucleotide and protein sequences chosen to illustrate the classical algorithms on this site.',
+    description_mk: 'Мала, внимателно одбрана збирка од 240 нуклеотидни и протеински секвенци, избрани за настава по класичните алгоритми за анализа на секвенци.',
+    description_en:'A small curated collection of 240 nucleotide and protein sequences chosen for teaching the classical sequence-analysis algorithms.',
     preview_csv:'accession,type,length,description,difficulty\nEDU-001,DNA,240,Lambda phage fragment with EcoRI sites,easy\nEDU-002,DNA,1044,Human beta-globin coding region,easy\nEDU-003,PROT,141,Human haemoglobin alpha chain,easy\nEDU-004,DNA,3120,Repeat-rich plant intron,hard\nEDU-005,PROT,398,Thermophilic glycoside hydrolase,medium' }
 ];
 const dStmt = ins(`INSERT INTO datasets (slug,title_mk,title_en,description_mk,description_en,format,size_mb,license,year,downloads,doi,organism,rows_count,preview_csv)
@@ -301,7 +307,7 @@ news.forEach(n => nStmt.run(n));
  * is the equivalent instant in UTC, marked with a Z. Storing a bare local
  * string made it incomparable with SQLite's datetime('now'), which is UTC.
  */
-function futureDate(offsetDays, hour) {
+function eventDate(offsetDays, hour) {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
   d.setHours(hour, 0, 0, 0);
@@ -314,8 +320,8 @@ const events = [
     description_en:'Guest seminar on applying graph representations to species with highly repetitive genomes.' },
   { off:13, h:10, dur:6, kind:'workshop', capacity:24, location:'Компјутерска лабораторија 2 / Computer Lab 2', speaker:'Filip Micevski', affiliation:'GenomikaLab',
     title_mk:'Работилница: порамнување на секвенци од нула', title_en:'Workshop: sequence alignment from scratch',
-    description_mk: 'Еднодневна работилница на која учесниците имплементираат Needleman–Wunsch и Smith–Waterman и ги споредуваат резултатите со алатките достапни на оваа веб-страница.',
-    description_en:'A one-day workshop in which participants implement Needleman–Wunsch and Smith–Waterman and compare results against the tools on this site.' },
+    description_mk: 'Еднодневна работилница на која учесниците од нула ги имплементираат Needleman–Wunsch и Smith–Waterman и ги споредуваат своите резултати со референтни имплементации.',
+    description_en:'A one-day workshop in which participants implement Needleman–Wunsch and Smith–Waterman from scratch and check their results against reference implementations.' },
   { off:21, h:15, dur:1, kind:'seminar', capacity:60, location:'Амфитеатар А / Lecture Hall A', speaker:'Dr. Elena Risteska', affiliation:'GenomikaLab',
     title_mk:'Колку структура е доволна за да се предвиди функција?', title_en:'How much structure is enough to predict function?',
     description_mk:'Внатрешен семинар со преглед на најновите резултати од групата за структурна биоинформатика.',
@@ -331,14 +337,27 @@ const events = [
   { off:62, h:11, dur:1, kind:'defense', capacity:40, location:'Сала за одбрани / Defence Room', speaker:'Bojan Naumovski', affiliation:'GenomikaLab',
     title_mk:'Одбрана на магистерска теза: визуелизација на конформациски ансамбли', title_en:'MSc defence: visualising conformational ensembles',
     description_mk:'Јавна одбрана на магистерската теза, отворена за сите заинтересирани.',
-    description_en:'Public defence of the MSc thesis, open to all interested attendees.' }
+    description_en:'Public defence of the MSc thesis, open to all interested attendees.' },
+  // Already held, so the archive has something in it.
+  { off:-9, h:13, dur:1, kind:'seminar', capacity:60, location:'Амфитеатар А / Lecture Hall A', speaker:'Sara Jovanoska', affiliation:'GenomikaLab',
+    title_mk:'Сезонски промени во бактериопланктонот на Охридското Езеро', title_en:'Seasonal change in the Lake Ohrid bacterioplankton',
+    description_mk:'Докторски семинар со првите резултати од тригодишното месечно земање примероци.',
+    description_en:'A doctoral seminar presenting the first results of three years of monthly sampling.' },
+  { off:-23, h:10, dur:4, kind:'workshop', capacity:20, location:'Компјутерска лабораторија 2 / Computer Lab 2', speaker:'Filip Micevski', affiliation:'GenomikaLab',
+    title_mk:'Вовед во пресметковниот кластер „Вардар“', title_en:'Getting started on the “Vardar” cluster',
+    description_mk:'Практична работилница за нови корисници: најава, распоредувачот на задачи и добри практики за складирање податоци.',
+    description_en:'A hands-on session for new users: signing in, the job scheduler and good practice for storing data.' },
+  { off:-51, h:16, dur:1, kind:'seminar', capacity:60, location:'Амфитеатар А / Lecture Hall A', speaker:'Dr. Marko Stefanovski', affiliation:'GenomikaLab',
+    title_mk:'Инверзии што се враќаат: структурни варијанти кај балканските ендемити', title_en:'Inversions that keep coming back: structural variants in Balkan endemics',
+    description_mk:'Преглед на резултатите од пангеномот на 120 ендемични видови и прашањата што тие ги отвораат.',
+    description_en:'An overview of the 120-species pangenome results and the questions they open.' }
 ];
 const eStmt = ins(`INSERT INTO events (title_mk,title_en,description_mk,description_en,starts_at,ends_at,location,speaker,affiliation,capacity,kind)
   VALUES (@title_mk,@title_en,@description_mk,@description_en,@starts_at,@ends_at,@location,@speaker,@affiliation,@capacity,@kind)`);
 events.forEach(e => eStmt.run({
   ...e,
-  starts_at: futureDate(e.off, e.h),
-  ends_at: futureDate(e.off, e.h + e.dur)
+  starts_at: eventDate(e.off, e.h),
+  ends_at: eventDate(e.off, e.h + e.dur)
 }));
 
 /* ----------------------------------------------------------- INSTRUMENTS */
@@ -374,36 +393,39 @@ instruments.forEach(i => iStmt.run(i));
 const I = Object.fromEntries(db.prepare('SELECT slug,id FROM instruments').all().map(r => [r.slug, r.id]));
 
 /* ------------------------------------------------------------- POSITIONS */
+/* Deadlines are relative to the seeding date, as event dates are: fixed dates
+   left every "open" position already closed by the time anyone saw it. */
+const inDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return localDate(d); };
 const positions = [
-  { slug:'phd-pangenome-2026', kind:'phd', group_id:G['comparative-genomics'], deadline:'2026-01-31', is_open:1,
+  { slug:'phd-pangenome', kind:'phd', group_id:G['comparative-genomics'], deadline:inDays(75), is_open:1,
     title_mk:'Докторска позиција: алгоритми за пангеномски графови',
     title_en:'PhD position: algorithms for pangenome graphs',
     description_mk: 'Четиригодишна докторска позиција со обезбедено финансирање во рамките на проектот „Балкански пангеном“. Кандидатот ќе развива методи за идентификување структурни варијанти со помош на графовски репрезентации.',
     description_en:'A four-year funded PhD position within the Balkan Pangenome project. The candidate will develop methods for calling structural variants against graph representations.',
     requirements_mk: 'Диплома по информатика, математика или сродна област;Добро познавање на програмирање во C++, Rust или Python;Интерес за биологија, без услов за претходно знаење;Работно познавање на англискиот јазик',
     requirements_en:'Degree in computer science, mathematics or a related field;Solid programming in C++, Rust or Python;Interest in biology, prior knowledge not required;Working knowledge of English' },
-  { slug:'phd-microbiome-2026', kind:'phd', group_id:G['microbiome-ml'], deadline:'2026-01-31', is_open:1,
+  { slug:'phd-microbiome', kind:'phd', group_id:G['microbiome-ml'], deadline:inDays(75), is_open:1,
     title_mk:'Докторска позиција: машинско учење за метагеномски податоци',
     title_en:'PhD position: machine learning for metagenomic data',
     description_mk: 'Позиција во групата за микробиом, насочена кон учење репрезентации од временски серии на микробни заедници.',
     description_en:'A position in the microbiome group focused on representation learning over time series of microbial communities.',
     requirements_mk: 'Диплома по информатика, статистика или биологија;Искуство со Python и библиотеки за машинско учење;Подготвеност за учество во теренска работа неколкупати годишно',
     requirements_en:'Degree in computer science, statistics or biology;Experience with Python and machine-learning libraries;Willingness to join field work a few times a year' },
-  { slug:'rse-webtools', kind:'staff', group_id:G['structural-bioinformatics'], deadline:'2025-12-15', is_open:1,
+  { slug:'rse-webtools', kind:'staff', group_id:G['structural-bioinformatics'], deadline:inDays(40), is_open:1,
     title_mk:'Инженер за истражувачки софтвер (веб-алатки)',
     title_en:'Research software engineer (web tools)',
     description_mk: 'Работно место со полно работно време за развој и одржување на јавните алатки на лабораторијата, вклучително и оние што се извршуваат директно во прелистувачот.',
     description_en:'A full-time role developing and maintaining the laboratory public tools, including those that execute directly in the browser.',
     requirements_mk: 'Најмалку две години искуство со TypeScript и React;Познавање на пристапноста и перформансите;Способност за соработка со научници, а не само со програмери',
     requirements_en:'At least two years of experience with TypeScript and React;Understanding of accessibility and performance;Comfort working with scientists, not only with programmers' },
-  { slug:'intern-summer-2026', kind:'internship', group_id:G['comparative-genomics'], deadline:'2026-03-15', is_open:1,
+  { slug:'intern-summer', kind:'internship', group_id:G['comparative-genomics'], deadline:inDays(120), is_open:1,
     title_mk:'Летна пракса за студенти (8 недели)',
     title_en:'Summer internship for students (8 weeks)',
     description_mk: 'Платена летна пракса за студенти на додипломски студии. Секој практикант работи на едно мало, јасно ограничено истражувачко прашање и на крајот ги презентира резултатите пред лабораторијата.',
     description_en:'A paid summer internship for undergraduate students. Each intern works on one small, self-contained question and presents the result to the laboratory at the end.',
     requirements_mk: 'Завршена втора година од студиите;Основни програмерски вештини;Љубопитност и желба за учење надвор од досегашното искуство',
     requirements_en:'Second year of study completed;Basic programming;Curiosity that exceeds prior experience' },
-  { slug:'postdoc-structure-2025', kind:'postdoc', group_id:G['structural-bioinformatics'], deadline:'2025-05-01', is_open:0,
+  { slug:'postdoc-structure', kind:'postdoc', group_id:G['structural-bioinformatics'], deadline:inDays(-160), is_open:0,
     title_mk: 'Постдокторска позиција: предвидување на стабилноста (затворена)',
     title_en:'Postdoctoral position: stability prediction (closed)',
     description_mk:'Позицијата е пополнета во јуни 2025 година.',
@@ -443,7 +465,7 @@ users.forEach(([email, pw, role, slug]) => uStmt.run(email, bcrypt.hashSync(pw, 
 
 /* -------------------------------------------------------- SAMPLE BOOKINGS */
 const today = new Date();
-const iso = (d) => d.toISOString().slice(0, 10);
+const iso = localDate;
 const bStmt = ins(`INSERT INTO bookings (instrument_id,user_id,user_name,user_email,date,start_hour,end_hour,purpose,status)
   VALUES (?,?,?,?,?,?,?,?,?)`);
 const sample = [

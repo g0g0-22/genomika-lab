@@ -21,9 +21,27 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  */
 export function createApp({ quiet = false } = {}) {
   const app = express();
+
+  /*
+   * nginx and the platform's ingress sit in front of this process. Trusting the
+   * private-network hops lets req.ip resolve to the real client: Express reads
+   * X-Forwarded-For from the right and stops at the first address that is not
+   * a trusted proxy, so a value a client forges on the left is never reached.
+   */
+  app.set('trust proxy', 'loopback, linklocal, uniquelocal');
   app.use(cors());
   app.use(express.json({ limit: '6mb' }));
   app.use(readToken);
+
+  // A repeated query key (?group=a&group=b) arrives as an array, which every
+  // handler here would pass straight into SQL and fail on. Keep the first.
+  app.use((req, _res, next) => {
+    for (const [key, value] of Object.entries(req.query)) {
+      if (Array.isArray(value)) req.query[key] = value[0];
+      else if (value !== null && typeof value === 'object') delete req.query[key];
+    }
+    next();
+  });
 
   /* Small request log — helpful when demonstrating the system live. */
   if (!quiet) {
@@ -37,7 +55,7 @@ export function createApp({ quiet = false } = {}) {
 
   /* ------------------------------------------------------------------ AUTH */
   app.post('/api/auth/login', (req, res) => {
-    const key = throttleKey(req, req.body?.email);
+    const key = throttleKey(req);
     if (tooManyAttempts(key)) return res.status(429).json({ error: 'too_many_attempts' });
 
     const user = authenticate(req.body?.email, req.body?.password);
@@ -73,6 +91,16 @@ export function createApp({ quiet = false } = {}) {
   app.use('/api', (_req, res) => res.status(404).json({ error: 'unknown_endpoint' }));
 
   app.use((err, _req, res, _next) => {
+    // Client errors raised by middleware — malformed JSON, an oversized body —
+    // carry their own status. Reporting those as 500 blamed the server for a
+    // bad request.
+    const status = err.status || err.statusCode;
+    if (status >= 400 && status < 500) {
+      const error = err.type === 'entity.too.large' ? 'payload_too_large'
+        : err.type === 'entity.parse.failed' ? 'malformed_json'
+        : 'bad_request';
+      return res.status(status).json({ error });
+    }
     // Logged in full server-side; the client is told only that it failed.
     if (!quiet) console.error(err);
     res.status(500).json({ error: 'internal_error' });

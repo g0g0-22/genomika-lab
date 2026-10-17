@@ -65,7 +65,7 @@ function ThemeSwitch() {
     <button
       onClick={toggle}
       className="text-muted hover:text-ink transition-colors p-1"
-      aria-label={`${t('foot.theme')}: ${theme}`}
+      aria-label={`${t('foot.theme')}: ${t(theme === 'dark' ? 'theme.dark' : 'theme.light')}`}
       title={t('foot.theme')}
     >
       {theme === 'dark' ? (
@@ -155,6 +155,10 @@ function Nav() {
               <LangSwitch />
               <ThemeSwitch />
             </div>
+            {/* The mobile menu lists this too; without it here a desktop admin had no way in. */}
+            {user?.role === 'admin' && (
+              <NavLink to="/admin" className={state => `hidden lg:inline ${link(state)}`}>{t('nav.admin')}</NavLink>
+            )}
             <Link to="/contact" className="btn btn-primary btn-sm hidden md:inline-flex">
               {t('nav.contact')}
               <span aria-hidden="true">→</span>
@@ -260,9 +264,12 @@ function Footer() {
                   <Link to={item.to} className="text-[14px] text-ink2 hover:text-ink link-underline">{t(item.key)}</Link>
                 </li>
               ))}
+              {user?.role === 'admin' && (
+                <li><Link to="/admin" className="text-[14px] text-ink2 hover:text-ink link-underline">{t('nav.admin')}</Link></li>
+              )}
               <li>
                 {user
-                  ? <button onClick={logout} className="text-[14px] text-ink2 hover:text-ink link-underline">{t('nav.logout')}</button>
+                  ? <button type="button" onClick={logout} className="text-[14px] text-ink2 hover:text-ink link-underline">{t('nav.logout')}</button>
                   : <Link to="/login" className="text-[14px] text-ink2 hover:text-ink link-underline">{t('nav.login')}</Link>}
               </li>
             </ul>

@@ -11,7 +11,7 @@ export type User = {
 type Ctx = {
   user: User | null;
   ready: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => void;
 };
 
@@ -33,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const r = await post<{ token: string; user: User }>('/auth/login', { email, password });
     setToken(r.token);
     setUser(r.user);
+    return r.user;
   };
 
   const logout = () => { setToken(null); setUser(null); };

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useLang } from '../../i18n';
 import { useAuth } from '../../lib/auth';
 import { useFetch } from '../../lib/useFetch';
+import { localIsoDate } from '../../lib/dates';
 import { post, put, del, ApiError, downloadProtected } from '../../lib/api';
 import { PageHeader, Card, Label, Loading, ErrorBox, Empty, Toggle, Field, Notice, Stat } from '../../components/ui';
 
@@ -67,6 +68,18 @@ export default function Admin() {
   const news = useFetch<NewsRow[]>(user?.role === 'admin' ? '/news' : null, [user?.id, flash]);
   const people = useFetch<PersonRow[]>(user?.role === 'admin' ? '/people' : null, [user?.id, flash]);
 
+  // Every hook must run on every render, in the same order. They sit above the
+  // early returns below: placing them after one made the first render (before
+  // the session is known) call fewer hooks than the next, and React aborted
+  // with error #310 — a blank page on any direct load of /admin.
+  const inbox = useMutation(() => overview.reload());
+  const done = (message: string) => { setFlash(`${message} ${Date.now()}`); overview.reload(); };
+  useEffect(() => {
+    if (!flash) return;
+    const id = setTimeout(() => setFlash(null), 4000);
+    return () => clearTimeout(id);
+  }, [flash]);
+
   if (!ready) return <Loading />;
   if (!user) {
     return (
@@ -87,13 +100,6 @@ export default function Admin() {
     );
   }
 
-  const inbox = useMutation(() => overview.reload());
-  const done = (message: string) => { setFlash(`${message} ${Date.now()}`); overview.reload(); };
-  useEffect(() => {
-    if (!flash) return;
-    const id = setTimeout(() => setFlash(null), 4000);
-    return () => clearTimeout(id);
-  }, [flash]);
 
   return (
     <>
@@ -120,7 +126,7 @@ export default function Admin() {
               <section className="grid grid-cols-2 md:grid-cols-4 gap-8 pb-12 border-b border-line">
                 {Object.entries(overview.data.counts).map(([key, value], i) => (
                   <div key={key} className="rise" style={{ animationDelay: `${i * 45}ms` }}>
-                    <Stat value={formatNumber(value)} label={key.replace(/_/g, ' ')} />
+                    <Stat value={formatNumber(value)} label={t(`adm.count.${key}` as any)} />
                   </div>
                 ))}
               </section>
@@ -346,7 +352,7 @@ function PublicationEditor({ rows, onDone }: { rows: Pub[]; onDone: () => void }
   );
 }
 
-const EMPTY_NEWS = { title_mk: '', title_en: '', excerpt_mk: '', excerpt_en: '', body_mk: '', body_en: '', tag: 'news', date: new Date().toISOString().slice(0, 10) };
+const EMPTY_NEWS = { title_mk: '', title_en: '', excerpt_mk: '', excerpt_en: '', body_mk: '', body_en: '', tag: 'news', date: localIsoDate() };
 
 function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
   const { t, f, formatDate } = useLang();

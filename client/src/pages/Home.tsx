@@ -3,6 +3,7 @@ import { useLang } from '../i18n';
 import { useFetch } from '../lib/useFetch';
 import { Label, ArrowLink, Stat, accentVar } from '../components/ui';
 import { Helix } from '../components/Helix';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 type Group = {
   id: number; slug: string; accent: string; founded: number;
@@ -39,6 +40,7 @@ export default function Home() {
   const groups = useFetch<Group[]>('/groups');
   const news = useFetch<NewsItem[]>('/news?limit=3');
   const events = useFetch<EventItem[]>('/events?scope=upcoming');
+  useDocumentTitle();
   const metrics = useFetch<Metrics>('/metrics');
   const totals = metrics.data?.totals;
 

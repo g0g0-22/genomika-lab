@@ -1,6 +1,7 @@
 import { type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLang } from '../i18n';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 /* ----------------------------------------------------------- PRIMITIVES */
 
@@ -54,6 +55,7 @@ export function DnaStrip({ seed = 'genomika', count = 48, className = '' }: {
 export function PageHeader({ index, title, lead, children }: {
   index: string; title: string; lead?: string; children?: ReactNode;
 }) {
+  useDocumentTitle(title);
   const folio = index.split('/')[0].trim();
   return (
     <header className="mb-20 md:mb-28">
@@ -126,6 +128,20 @@ export function ErrorBox({ onRetry }: { onRetry?: () => void }) {
     <div className="card p-7 my-10" role="alert">
       <p className="text-[14px] text-danger">{t('common.error')}</p>
       {onRetry && <button className="btn btn-sm mt-5" onClick={onRetry}>{t('common.retry')}</button>}
+    </div>
+  );
+}
+
+/** The 404 page, also shown when a detail page's record does not exist. */
+export function NotFound() {
+  const { t } = useLang();
+  useDocumentTitle(t('err.404.title'));
+  return (
+    <div className="py-24 text-center">
+      <p className="num text-accent text-6xl">404</p>
+      <h1 className="mt-6 text-3xl">{t('err.404.title')}</h1>
+      <p className="mt-3 text-muted max-w-md mx-auto">{t('err.404.body')}</p>
+      <Link to="/" className="btn btn-primary mt-8">{t('err.404.home')}</Link>
     </div>
   );
 }
@@ -216,14 +232,10 @@ export function Crumb({ to, label }: { to: string; label: string }) {
 
 /* ---------------------------------------------------------------- UTILS */
 
-/**
- * Maps a group's accent key onto its categorical series colour. 'amber' is the
- * key stored by older seeds; the colour it names is now a rose, chosen because
- * green and amber were indistinguishable under simulated protanopia.
- */
+/** Maps a group's accent key (green, blue or rose) onto its series colour. */
 export const accentVar = (accent?: string) =>
   accent === 'blue' ? 'var(--s-blue)'
-    : accent === 'amber' || accent === 'rose' ? 'var(--s-rose)'
+    : accent === 'rose' ? 'var(--s-rose)'
     : 'var(--s-green)';
 
 export function CopyButton({ text, label }: { text: string; label?: string }) {
@@ -232,9 +244,12 @@ export function CopyButton({ text, label }: { text: string; label?: string }) {
     <button
       className="btn btn-sm"
       onClick={async (e) => {
+        // React clears currentTarget once the handler yields, so it has to be
+        // captured before the await — reading it afterwards threw silently and
+        // the button never said "Copied".
+        const el = e.currentTarget;
         try {
           await navigator.clipboard.writeText(text);
-          const el = e.currentTarget;
           const original = el.textContent;
           el.textContent = t('common.copied');
           setTimeout(() => { el.textContent = original; }, 1400);

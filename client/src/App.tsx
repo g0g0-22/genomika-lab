@@ -1,6 +1,6 @@
-import { Routes, Route, Link } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
-import { useLang } from './i18n';
+import { NotFound } from './components/ui';
 
 import Home from './pages/Home';
 import Research from './pages/Research';
@@ -21,18 +21,6 @@ import Admin from './pages/admin/Admin';
 import ToolsHub from './pages/Tools';
 import Toolkit from './pages/tools/Toolkit';
 import Gel from './pages/tools/Gel';
-
-function NotFound() {
-  const { t } = useLang();
-  return (
-    <div className="py-24 text-center">
-      <p className="num text-accent text-6xl">404</p>
-      <h1 className="mt-6 text-3xl">{t('err.404.title')}</h1>
-      <p className="mt-3 text-muted max-w-md mx-auto">{t('err.404.body')}</p>
-      <Link to="/" className="btn btn-primary mt-8">{t('err.404.home')}</Link>
-    </div>
-  );
-}
 
 export default function App() {
   return (

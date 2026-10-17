@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react';
 import { useLang } from '../i18n';
 import { Crumb } from './ui';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 import type { DictKey } from '../i18n/dict';
 
 export function ToolShell({ index, name, desc, children }: {
   index: string; name: DictKey; desc: DictKey; children: ReactNode;
 }) {
   const { t } = useLang();
+  useDocumentTitle(t(name));
   return (
     <>
       <div className="mb-8">

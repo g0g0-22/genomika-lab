@@ -4,6 +4,7 @@ import { useLang } from '../i18n';
 import { useFetch } from '../lib/useFetch';
 import { post, del, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { localIsoDate } from '../lib/dates';
 import { PageHeader, Card, Label, Loading, ErrorBox, Empty, Notice, Field } from '../components/ui';
 
 type Instrument = {
@@ -13,14 +14,14 @@ type Instrument = {
   name_mk: string; name_en: string; description_mk: string; description_en: string;
 };
 
-type Slot = { hour: number; free: boolean; booking: { id: number; user_name: string; user_name_mk: string; user_name_en: string; purpose: string } | null };
+type Slot = { hour: number; free: boolean; past: boolean; booking: { id: number; user_name: string; user_name_mk: string; user_name_en: string; purpose: string } | null };
 type Availability = { instrument: Instrument; date: string; slots: Slot[] };
 type Booking = {
   id: number; date: string; start_hour: number; end_hour: number; purpose: string; status: string;
   instrument_slug: string; instrument_mk: string; instrument_en: string;
 };
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => localIsoDate();
 const pad = (h: number) => `${String(h).padStart(2, '0')}:00`;
 
 export default function Facilities() {
@@ -58,7 +59,7 @@ export default function Facilities() {
     const from = Math.min(hour, ...hours);
     const to = Math.max(hour, ...hours);
     const span = Array.from({ length: to - from + 1 }, (_, i) => from + i);
-    const allFree = span.every(h => slots.find(s => s.hour === h)?.free);
+    const allFree = span.every(h => { const s = slots.find(x => x.hour === h); return s?.free && !s.past; });
     if (!allFree || span.length > instrument.max_hours) { setHours([hour]); return; }
     setHours(span);
   };
@@ -82,7 +83,8 @@ export default function Facilities() {
       mine.reload();
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'error';
-      const known = ['slot_taken', 'exceeds_max_hours', 'outside_opening_hours', 'date_in_past', 'instrument_unavailable'];
+      const known = ['slot_taken', 'exceeds_max_hours', 'outside_opening_hours', 'date_in_past', 'instrument_unavailable',
+                     'too_far_ahead', 'quota_exceeded'];
       setMessage({ kind: 'error', text: known.includes(code) ? t(`fac.err.${code}` as any) : t('common.error') });
     } finally {
       setSaving(false);
@@ -90,10 +92,26 @@ export default function Facilities() {
   };
 
   const cancel = async (id: number) => {
-    await del(`/bookings/${id}`);
+    if (!window.confirm(t('fac.confirmcancel'))) return;
+    try {
+      await del(`/bookings/${id}`);
+      setMessage({ kind: 'ok', text: t('fac.cancelled') });
+    } catch (err) {
+      const finished = err instanceof ApiError && err.code === 'booking_finished';
+      setMessage({ kind: 'error', text: finished ? t('fac.err.booking_finished') : t('common.error') });
+    }
     mine.reload();
     availability.reload();
   };
+
+  // Only bookings that have not yet ended can be cancelled, so only those are listed, soonest first.
+  const upcoming = useMemo(() => {
+    const today = todayIso();
+    const hour = new Date().getHours();
+    return (mine.data ?? [])
+      .filter(b => b.status !== 'cancelled' && (b.date > today || (b.date === today && b.end_hour > hour)))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.start_hour - b.start_hour);
+  }, [mine.data]);
 
   const byCategory = useMemo(() => {
     const map = new Map<string, Instrument[]>();
@@ -202,26 +220,29 @@ export default function Facilities() {
                 <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(78px, 1fr))' }}>
                   {slots.map(slot => {
                     const selected = hours.includes(slot.hour);
+                    const open = slot.free && !slot.past;
+                    const state = !slot.free ? t('fac.taken') : slot.past ? t('fac.pastslot') : t('fac.freeslot');
                     return (
                       <button
                         key={slot.hour}
-                        onClick={() => slot.free && pick(slot.hour)}
-                        disabled={!slot.free || instrument.status !== 'available'}
+                        type="button"
+                        onClick={() => open && pick(slot.hour)}
+                        disabled={!open || instrument.status !== 'available'}
                         aria-pressed={selected}
                         title={slot.booking
                           ? `${f(slot.booking, 'user_name')} — ${slot.booking.purpose ?? ''}`
-                          : slot.free ? t('fac.freeslot') : t('fac.taken')}
+                          : state}
                         className={`px-2 py-3 rounded-xs border text-center transition-colors ${
                           selected
                             ? 'border-accent bg-accent text-bg'
-                            : slot.free
+                            : open
                               ? 'border-line hover:border-accent text-ink2'
                               : 'border-linesoft bg-bg3 text-muted cursor-not-allowed'
                         }`}
                       >
                         <span className="num text-[12px] block">{pad(slot.hour)}</span>
                         <span className="label block mt-1 !text-[8.5px]" style={selected ? { color: 'var(--paper)' } : undefined}>
-                          {slot.free ? t('fac.freeslot') : t('fac.taken')}
+                          {state}
                         </span>
                       </button>
                     );
@@ -273,15 +294,15 @@ export default function Facilities() {
           {user && (
             <Card className="p-6">
               <h3 className="label mb-4">{t('fac.mybookings')}</h3>
-              {mine.data?.length === 0 && <p className="text-[13px] text-muted">{t('fac.nobookings')}</p>}
+              {mine.data && upcoming.length === 0 && <p className="text-[13px] text-muted">{t('fac.nobookings')}</p>}
               <ul className="space-y-2.5">
-                {mine.data?.filter(b => b.status !== 'cancelled').map(booking => (
+                {upcoming.map(booking => (
                   <li key={booking.id} className="flex flex-wrap items-center gap-4 py-2.5 border-b border-linesoft last:border-0">
                     <span className="num text-[13px] text-accent w-24">{formatDate(booking.date, { day: '2-digit', month: 'short' })}</span>
                     <span className="num text-[13px] w-28">{pad(booking.start_hour)} – {pad(booking.end_hour)}</span>
                     <span className="text-[13px] flex-1 min-w-[160px]">{f(booking, 'instrument')}</span>
                     <span className="text-[12px] text-muted flex-1 min-w-[120px] truncate">{booking.purpose}</span>
-                    <button className="btn btn-sm" onClick={() => cancel(booking.id)}>{t('fac.cancel')}</button>
+                    <button type="button" className="btn btn-sm" onClick={() => cancel(booking.id)}>{t('fac.cancel')}</button>
                   </li>
                 ))}
               </ul>

@@ -9,6 +9,9 @@ const DEMO = [
   { role: 'auth.demoresearch', email: 'n.avramovski@genomika.mk', password: 'genomika2026' }
 ] as const;
 
+/** Where each role lands after signing in: administrators have the admin panel to go to. */
+const home = (role: string) => (role === 'admin' ? '/admin' : '/facilities');
+
 export default function Login() {
   const { t, f } = useLang();
   const { user, login } = useAuth();
@@ -18,15 +21,15 @@ export default function Login() {
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  if (user) return <Navigate to="/facilities" replace />;
+  if (user) return <Navigate to={home(user.role)} replace />;
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setError(false);
     try {
-      await login(email, password);
-      navigate('/facilities');
+      const signedIn = await login(email, password);
+      navigate(home(signedIn.role));
     } catch {
       setError(true);
     } finally {

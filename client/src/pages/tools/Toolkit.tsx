@@ -6,7 +6,7 @@ import { useDebounced } from '../../lib/useDebounced';
 import { SeqView } from '../../components/SeqView';
 import { Toggle, CopyButton, download, Empty } from '../../components/ui';
 import {
-  parseFasta, cleanSequence, detectKind, reverseComplement, complement, reverse,
+  parseFasta, cleanSequence, detectKind, classifyInput, reverseComplement, complement, reverse,
   transcribe, translate, translateAllFrames, findOrfs, gcContent, baseCounts,
   molecularWeight, meltingTemp, meltingTempApplies, formatMass, toFasta
 } from '../../lib/bio/sequence';
@@ -15,6 +15,8 @@ import { HBB_CDS } from '../../lib/bio/samples';
 const NT_COLOR: Record<string, string> = {
   A: '#3F7D5A', C: '#3C6490', G: '#9A7430', T: '#A24B46', U: '#A24B46', N: 'var(--muted)'
 };
+
+const ONE_DECIMAL = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
 
 export default function Toolkit() {
   const { t, lang, formatNumber } = useLang();
@@ -25,11 +27,16 @@ export default function Toolkit() {
   const [minAa, setMinAa] = useState(30);
   const [openOrf, setOpenOrf] = useState<number | null>(null);
 
-  const { seq, dropped, id } = useMemo(() => {
+  // Only the first record is analysed. Joining every record into one string
+  // invented sequence that existed in none of them — a reading frame or a
+  // restriction site could straddle two unrelated records.
+  const { seq, dropped, id, recordCount, isProtein } = useMemo(() => {
     const records = parseFasta(input);
-    const joined = records.map(r => r.seq).join('');
-    const cleaned = cleanSequence(joined);
-    return { seq: cleaned.seq, dropped: cleaned.dropped, id: records[0]?.id ?? 'sequence' };
+    const first = records[0];
+    const isProtein = first ? classifyInput(first.seq) === 'protein' : false;
+    const cleaned = isProtein ? { seq: '', dropped: 0 } : cleanSequence(first?.seq ?? '');
+    return { seq: cleaned.seq, dropped: cleaned.dropped, id: first?.id ?? 'sequence',
+             recordCount: records.length, isProtein };
   }, [input]);
 
   const kind = detectKind(seq);
@@ -51,6 +58,9 @@ export default function Toolkit() {
               onChange={setRaw}
               onExample={() => setRaw(`>HBB Homo sapiens haemoglobin subunit beta\n${HBB_CDS}`)}
               dropped={dropped}
+              records={recordCount}
+              firstId={id}
+              protein={isProtein}
               rows={7}
             />
           </Panel>
@@ -194,10 +204,10 @@ export default function Toolkit() {
             ) : (
               <div className="grid grid-cols-2 gap-y-5 gap-x-4">
                 <Metric label={t('seq.length')} value={formatNumber(seq.length)} unit="nt" />
-                <Metric label={t('seq.gc')} value={`${(gcContent(seq) * 100).toFixed(1)}`} unit="%" />
+                <Metric label={t('seq.gc')} value={formatNumber(gcContent(seq) * 100, ONE_DECIMAL)} unit="%" />
                 <Metric
                   label={t('seq.tm')}
-                  value={meltingTempApplies(seq) ? meltingTemp(seq).toFixed(1) : '—'}
+                  value={meltingTempApplies(seq) ? formatNumber(meltingTemp(seq), ONE_DECIMAL) : '—'}
                   unit={meltingTempApplies(seq) ? '°C' : undefined}
                 />
                 <Metric
@@ -229,7 +239,7 @@ export default function Toolkit() {
                       <div className="flex items-baseline justify-between mb-1">
                         <span className={`num text-sm nt-${row.base}`}>{row.base}</span>
                         <span className="num text-[11px] text-muted">
-                          {formatNumber(row.count)} · {(share * 100).toFixed(1)}%
+                          {formatNumber(row.count)} · {formatNumber(share * 100, ONE_DECIMAL)}%
                         </span>
                       </div>
                       <div className="h-1.5 bg-bg3 rounded-[3px] overflow-hidden">

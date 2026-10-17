@@ -2,7 +2,7 @@
   "name": "genomika-lab",
   "version": "1.0.0",
   "private": true,
-  "description": "GenomikaLab \u2014 a fictional bioinformatics research laboratory: institutional site, browser-native analysis tools, instrument booking and content administration.",
+  "description": "GenomikaLab — a fictional bioinformatics research laboratory: institutional site, browser-native analysis tools, instrument booking and content administration.",
   "scripts": {
     "install:all": "npm --prefix server install && npm --prefix client install",
     "seed": "npm --prefix server run seed",
@@ -13,6 +13,9 @@
     "test": "npm --prefix client test && npm --prefix server test",
     "setup": "npm run install:all && npm run seed && npm run build",
     "test:client": "npm --prefix client test",
-    "test:server": "npm --prefix server test"
+    "test:server": "npm --prefix server test",
+    "lint": "npm --prefix client run lint",
+    "check:contrast": "node scripts/check-contrast.mjs",
+    "smoke": "node scripts/smoke.mjs"
   }
 }

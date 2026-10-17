@@ -8,7 +8,7 @@ import {
   ENZYMES, findCutSites, digest, recognitionSequence, migration,
   LADDER_1KB, LADDER_100BP, GEL_RANGES, type Enzyme
 } from '../../lib/bio/enzymes';
-import { cleanSequence, parseFasta, IUPAC_DNA_ALPHABET } from '../../lib/bio/sequence';
+import { cleanSequence, parseFasta, classifyInput, IUPAC_DNA_ALPHABET } from '../../lib/bio/sequence';
 import { PLASMID_FRAGMENT } from '../../lib/bio/samples';
 
 const GEL_HEIGHT = 380;
@@ -24,9 +24,13 @@ export default function Gel() {
   const [topology, setTopology] = useState('linear');
   const [runId, setRunId] = useState(0);
 
+  // The first record only: joining records manufactured restriction sites
+  // across the boundary between two unrelated sequences.
+  const parsed = useMemo(() => parseFasta(input), [input]);
+  const isProtein = parsed[0] ? classifyInput(parsed[0].seq) === 'protein' : false;
   const seq = useMemo(
-    () => cleanSequence(parseFasta(input).map(r => r.seq).join(''), IUPAC_DNA_ALPHABET).seq,
-    [input]
+    () => (isProtein ? '' : cleanSequence(parsed[0]?.seq ?? '', IUPAC_DNA_ALPHABET).seq),
+    [parsed, isProtein]
   );
 
   const enzymes = useMemo(
@@ -34,7 +38,10 @@ export default function Gel() {
     [selected]
   );
 
-  const sites = useMemo(() => (seq ? findCutSites(seq, enzymes) : []), [seq, enzymes]);
+  const sites = useMemo(
+    () => (seq ? findCutSites(seq, enzymes, topology === 'circular') : []),
+    [seq, enzymes, topology]
+  );
   const fragments = useMemo(
     () => (seq ? digest(seq, sites, topology === 'circular') : []),
     [seq, sites, topology]
@@ -147,7 +154,7 @@ export default function Gel() {
                 />
               </div>
               <button className="btn btn-primary w-full justify-center" onClick={() => setRunId(n => n + 1)} disabled={!seq}>
-                ⚡ {t('gel.run')}
+                ↻ {t('gel.run')}
               </button>
             </div>
           </Panel>
@@ -158,7 +165,7 @@ export default function Gel() {
                 <Metric label={t('seq.length')} value={formatNumber(seq.length)} unit="bp" />
                 <Metric label={t('gel.sites')} value={sites.length} />
                 <Metric label={t('gel.fragments')} value={fragments.length} />
-                <Metric label="max" value={formatNumber(fragments[0]?.length ?? 0)} unit="bp" />
+                <Metric label={t('gel.largest')} value={formatNumber(fragments[0]?.length ?? 0)} unit="bp" />
               </div>
               {fragments.length > 1 && (
                 <button className="btn btn-sm mt-5 w-full justify-center" onClick={exportFragments}>CSV</button>
@@ -173,7 +180,18 @@ export default function Gel() {
             <SequenceInput
               value={raw}
               onChange={setRaw}
-              onExample={() => { setRaw(`>pGL-demo synthetic multiple cloning site\n${PLASMID_FRAGMENT}`); setRunId(n => n + 1); }}
+              onExample={() => {
+                // A double digest whose four fragments all resolve on a 2 % gel,
+                // so the example shows a gel rather than a list of run-off notes.
+                setRaw(`>pGL-demo synthetic multiple cloning site\n${PLASMID_FRAGMENT}`);
+                setSelected(['PvuII', 'NdeI']);
+                setAgarose('2.0');
+                setTopology('linear');
+                setRunId(n => n + 1);
+              }}
+              records={parsed.length}
+              firstId={parsed[0]?.id}
+              protein={isProtein}
               rows={5}
             />
           </Panel>

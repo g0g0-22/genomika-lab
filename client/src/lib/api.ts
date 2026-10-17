@@ -44,6 +44,10 @@ export async function api<T = any>(path: string, init: RequestInit = {}): Promis
   return res.json();
 }
 
+/** Turns a server field-error code into a sentence, in the current language. */
+export const fieldError = (t: (key: any) => string, code?: string) =>
+  code ? t(`err.field.${code}`) : undefined;
+
 export const post = <T = any>(path: string, body: unknown) =>
   api<T>(path, { method: 'POST', body: JSON.stringify(body) });
 export const put = <T = any>(path: string, body: unknown) =>
