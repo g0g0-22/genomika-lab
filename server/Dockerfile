@@ -27,10 +27,12 @@ COPY --from=deps /build/node_modules ./node_modules
 COPY package.json ./
 COPY src ./src
 
-# All mutable state — the SQLite file and uploaded CVs — lives here and
-# nowhere else, so rebuilding the image never destroys it.
+# All mutable state — the SQLite file and uploaded CVs — lives in /data and
+# nowhere else, so rebuilding the image never destroys it. The entrypoint
+# starts as root, gives /data to the node user and drops to it (see the script).
 RUN mkdir -p /data && chown -R node:node /data /app
-USER node
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 EXPOSE 4000
 

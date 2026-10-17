@@ -10,3 +10,4 @@ server/uploads/
 *.tsbuildinfo
 i18n-review.json
 i18n-review.json.orig
+/data/

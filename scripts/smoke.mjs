@@ -6,7 +6,7 @@
  *
  * The unit and integration suites test the code in process. This tests the
  * thing that is actually deployed: requests go through nginx, across the
- * container network, into the api container and its volume. Every feature the
+ * container network, into the api container and its data folder. Every feature the
  * README advertises is exercised at least once. It writes demo records, so run
  * it against a disposable stack, never a live one with real data.
  *

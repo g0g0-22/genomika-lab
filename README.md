@@ -89,7 +89,7 @@ npm run check:contrast    # контраст и далтонизам за сек
 npm run test:client     # алгоритми / algorithms
 npm run test:server     # API
 
-# крај-до-крај, врз подигнат стек (nginx → api → волумен)
+# крај-до-крај, врз подигнат стек (nginx → api → ./data)
 BASE_URL=http://localhost:8080 npm run smoke
 ```
 
@@ -320,7 +320,7 @@ ingress:
                  ┌───────────────▼──────────────┐
                  │  api   node:4000             │
                  │  Express + SQLite            │
-                 │  volume: genomika-data       │
+                 │  bind mount: ./data → /data  │
                  └──────────────────────────────┘
 ```
 
@@ -376,19 +376,31 @@ moment of deployment — events and bookings always look current. Set
 | `JWT_SECRET` | **нема** / none | Потпишување на токени. Серверот одбива да стартува во продукција без неа |
 | `AUTO_SEED` | `true` | Полнење на празна база при прво подигање |
 | `ADMIN_PASSWORD` · `DEMO_PASSWORD` · `DEMO_LOGINS` | — · — · `none` | Демо сметки — види погоре / Demo accounts — see above |
-| `DB_PATH` | `/data/genomika.db` | SQLite датотека, на именуван волумен |
-| `UPLOAD_DIR` | `/data/uploads` | Прикачени биографии, на истиот волумен |
+| `DB_PATH` | `/data/genomika.db` | SQLite датотека, во `./data` на деплојментот |
+| `UPLOAD_DIR` | `/data/uploads` | Прикачени биографии, во истата папка |
 | `PORT` | `4000` | Внатрешна порта на `api`; nginx ја проследува, `stack.yml` изложува само `web:80` |
 | `TZ` | `Europe/Skopje` | Временска зона за „денес“ — резервации, рокови, статус на проекти |
 | `TRUSTED_PROXIES` | — | (web) Дополнителни опсези на проксија чиј `X-Forwarded-For` nginx го прифаќа; проксијата на сопствената мрежа се прифаќаат автоматски |
 
-Целата променлива состојба живее на именуваниот волумен `genomika-data`.
-RepoRun никогаш не брише волумени, па резервациите, пријавите и пораките
-испратени за време на прегледот преживуваат redeploy.
+Целата променлива состојба живее во папката `./data` покрај кодот, монтирана во
+`api` како `/data`. RepoRun не дозволува именувани волумени, туку само папки
+релативни на репозиториумот; `./data` е во `.gitignore`. Податоците преживуваат
+redeploy и рестарт — проверено со `docker compose down` и повторно `up`. Копчето
+**Delete runtime data** на RepoRun ги брише.
 
-All mutable state lives on the named volume `genomika-data`. RepoRun never
-removes volumes, so bookings, applications and messages submitted during review
-survive a redeploy.
+All mutable state lives in `./data` beside the code, mounted into `api` as
+`/data`. RepoRun allows no named volumes, only repo-relative folders; `./data`
+is gitignored. The data survives a redeploy or restart — checked with
+`docker compose down` and `up` again. RepoRun's **Delete runtime data** removes it.
+
+RepoRun ги бара и следниве правила, кои `docker-compose.yml` ги следи: секој
+сервис има `cpus` и `mem_limit` (web 0.25 / 64 MB, api 0.5 / 256 MB) и нема
+`restart`. Бидејќи Docker ја создава `./data` како root, `api` стартува како root
+само колку да ѝ ја предаде на корисникот `node`, па продолжува како тој
+(`server/docker-entrypoint.sh`). / RepoRun also requires, and the compose file
+follows: `cpus` and `mem_limit` on every service, and no `restart`. Because
+Docker creates `./data` as root, the api starts as root only long enough to
+hand it to the `node` user, then runs as that user.
 
 ### Локално, со Docker / Locally, with Docker
 

@@ -6,13 +6,18 @@
 #         directly; only reachable from web over the internal network.
 #
 # RepoRun exposes `web` (see stack.yml); `api` has no ingress of its own.
+#
+# RepoRun's rules, which this file follows: every service sets cpus and
+# mem_limit; no restart policy (the platform supervises); no named volumes —
+# persistent state is a bind mount of a repo-relative folder, ./data.
 
 services:
   web:
     build:
       context: ./client
       dockerfile: Dockerfile
-    restart: unless-stopped
+    cpus: 0.25
+    mem_limit: 64m
     depends_on:
       api:
         condition: service_healthy
@@ -27,7 +32,8 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
-    restart: unless-stopped
+    cpus: 0.5
+    mem_limit: 256m
     environment:
       NODE_ENV: production
       TZ: Europe/Skopje
@@ -47,11 +53,9 @@ services:
       # none (default), researcher, or all. Admin is listed only with "all".
       DEMO_LOGINS: ${DEMO_LOGINS:-none}
     volumes:
-      - genomika-data:/data
+      # The SQLite file and uploaded CVs. A folder beside the checkout rather
+      # than inside an image, so a rebuild or redeploy keeps every booking,
+      # application and message.
+      - ./data:/data
     expose:
       - "4000"
-
-volumes:
-  # Survives `docker compose down`, so bookings, applications and messages
-  # submitted during review are still there after a redeploy.
-  genomika-data:
