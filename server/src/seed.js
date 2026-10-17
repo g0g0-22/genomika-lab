@@ -468,10 +468,13 @@ const today = new Date();
 const iso = localDate;
 const bStmt = ins(`INSERT INTO bookings (instrument_id,user_id,user_name,user_email,date,start_hour,end_hour,purpose,status)
   VALUES (?,?,?,?,?,?,?,?,?)`);
+// Bookings by people who have an account belong to that account; the rest were
+// made on someone's behalf and carry only a name and address.
+const accountId = (email) => db.prepare('SELECT id FROM users WHERE email = ?').get(email)?.id ?? null;
 const sample = [
-  [I['nanopore-promethion'], 3, 'Nikola Avramovski','n.avramovski@genomika.mk', 0, 9, 13, 'Pangenome run — batch 14'],
-  [I['nanopore-promethion'], null,'Sara Jovanoska','s.jovanoska@genomika.mk', 1, 10, 14, 'Ohrid metagenome, March samples'],
-  [I['hpc-cluster'], 3, 'Nikola Avramovski','n.avramovski@genomika.mk', 0, 14, 20, 'SIMD benchmark suite'],
+  [I['nanopore-promethion'], accountId('n.avramovski@genomika.mk'), 'Nikola Avramovski','n.avramovski@genomika.mk', 0, 9, 13, 'Pangenome run — batch 14'],
+  [I['nanopore-promethion'], accountId('s.jovanoska@genomika.mk'), 'Sara Jovanoska','s.jovanoska@genomika.mk', 1, 10, 14, 'Ohrid metagenome, March samples'],
+  [I['hpc-cluster'], accountId('n.avramovski@genomika.mk'), 'Nikola Avramovski','n.avramovski@genomika.mk', 0, 14, 20, 'SIMD benchmark suite'],
   [I['qpcr-station'], null,'Ivana Petrushevska','i.petrushevska@genomika.mk', 2, 8, 11, 'Expression validation'],
   [I['illumina-nextseq'], null,'Tamara Gjorgjievska','t.gjorgjievska@genomika.mk', 3, 9, 15, '16S library, run 42'],
   [I['visualisation-wall'], null,'Bojan Naumovski','b.naumovski@genomika.mk', 1, 15, 18, 'Thesis figures review']

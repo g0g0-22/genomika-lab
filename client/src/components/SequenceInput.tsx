@@ -40,9 +40,10 @@ export function SequenceInput({ value, onChange, onExample, label, placeholder, 
         <Label>{label ?? t('seq.input')}</Label>
         <div className="flex flex-wrap items-center gap-2">
           {extra}
-          <button className="btn btn-sm" onClick={() => fileRef.current?.click()}>FASTA…</button>
-          {onExample && <button className="btn btn-sm" onClick={onExample}>{t('common.example')}</button>}
-          {value && <button className="btn btn-sm" onClick={() => onChange('')}>{t('common.clear')}</button>}
+          <button type="button" className="btn btn-sm" onClick={() => fileRef.current?.click()}
+                  aria-label={t('seq.loadfile')} title={t('seq.loadfile')}>FASTA…</button>
+          {onExample && <button type="button" className="btn btn-sm" onClick={onExample}>{t('common.example')}</button>}
+          {value && <button type="button" className="btn btn-sm" onClick={() => onChange('')}>{t('common.clear')}</button>}
         </div>
       </div>
       <input
@@ -60,6 +61,7 @@ export function SequenceInput({ value, onChange, onExample, label, placeholder, 
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder ?? t('seq.inputph')}
+        aria-label={label ?? t('seq.input')}
         spellCheck={false}
       />
       {protein ? (

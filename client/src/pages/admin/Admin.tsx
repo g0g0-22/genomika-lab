@@ -4,7 +4,7 @@ import { useLang } from '../../i18n';
 import { useAuth } from '../../lib/auth';
 import { useFetch } from '../../lib/useFetch';
 import { localIsoDate } from '../../lib/dates';
-import { post, put, del, ApiError, downloadProtected } from '../../lib/api';
+import { post, put, del, ApiError, downloadProtected, fieldError } from '../../lib/api';
 import { PageHeader, Card, Label, Loading, ErrorBox, Empty, Toggle, Field, Notice, Stat } from '../../components/ui';
 
 type Overview = {
@@ -27,6 +27,8 @@ const TABS = ['overview', 'publications', 'news', 'people', 'inbox'] as const;
  * its state updates ran, so a failed save looked exactly like nothing
  * happening at all.
  */
+const formatBytes = (bytes: number) => (bytes < 1024 ? `${bytes} B` : `${Math.round(bytes / 1024)} KB`);
+
 function useMutation(onSettled?: () => void) {
   const { t } = useLang();
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
@@ -46,8 +48,12 @@ function useMutation(onSettled?: () => void) {
       onSettled?.();
       return true;
     } catch (err) {
-      const code = err instanceof ApiError ? err.code : 'unknown';
-      setNotice({ kind: 'error', text: `${t('common.error')} — ${code}` });
+      // Say what was wrong, field by field, rather than echo an error code.
+      const text = !(err instanceof ApiError) ? t('common.error')
+        : err.code === 'slug_taken' ? t('adm.err.slug_taken')
+        : err.fields ? Object.entries(err.fields).map(([field, code]) => `${field}: ${fieldError(t, String(code))}`).join(' ')
+        : `${t('common.error')} (${err.code})`;
+      setNotice({ kind: 'error', text });
       return false;
     } finally {
       setBusy(false);
@@ -131,8 +137,9 @@ export default function Admin() {
                 ))}
               </section>
 
-              <section className="py-12 grid gap-8 lg:grid-cols-2">
-                <Card className="p-6">
+              {/* min-w-0: a grid item otherwise grows to its longest unbroken line. */}
+              <section className="py-12 grid grid-cols-1 gap-8 lg:grid-cols-2">
+                <Card className="p-6 min-w-0">
                   <h2 className="label mb-4">{t('adm.bookings')}</h2>
                   {overview.data.upcomingBookings.length === 0 && <Empty />}
                   <ul className="space-y-2.5">
@@ -141,21 +148,21 @@ export default function Admin() {
                         <span className="num text-[12px] text-accent w-20">{formatDate(booking.date, { day: '2-digit', month: 'short' })}</span>
                         <span className="num text-[12px] w-24">{String(booking.start_hour).padStart(2, '0')}:00–{String(booking.end_hour).padStart(2, '0')}:00</span>
                         <span className="text-[13px] flex-1 min-w-[140px] truncate">{f(booking, 'instrument')}</span>
-                        <span className="label truncate">{f(booking, 'user_name')}</span>
+                        <span className="label truncate min-w-0 max-w-full">{f(booking, 'user_name')}</span>
                       </li>
                     ))}
                   </ul>
                 </Card>
 
-                <Card className="p-6">
+                <Card className="p-6 min-w-0">
                   <h2 className="label mb-4">{t('adm.rsvps')}</h2>
                   {overview.data.rsvps.length === 0 && <Empty />}
                   <ul className="space-y-2.5">
                     {overview.data.rsvps.map(rsvp => (
                       <li key={rsvp.id} className="flex flex-wrap items-baseline gap-3 py-2 border-b border-linesoft last:border-0">
                         <span className="text-[13px] flex-1 min-w-[140px] truncate">{f(rsvp, 'event')}</span>
-                        <span className="label truncate">{rsvp.name}</span>
-                        <span className="num text-[11px] text-muted">{rsvp.email}</span>
+                        <span className="label truncate min-w-0 max-w-full">{rsvp.name}</span>
+                        <span className="num text-[11px] text-muted break-all">{rsvp.email}</span>
                       </li>
                     ))}
                   </ul>
@@ -175,7 +182,7 @@ export default function Admin() {
       {tab === 'people' && <PeopleEditor rows={people.data ?? []} onDone={() => done('people')} />}
 
       {tab === 'inbox' && overview.data && (
-        <div className="grid gap-8 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
           {inbox.notice && (
             <div className="lg:col-span-2"><Notice kind={inbox.notice.kind}>{inbox.notice.text}</Notice></div>
           )}
@@ -204,14 +211,16 @@ export default function Admin() {
                       )}
                       disabled={inbox.busy}
                     >
-                      ↓ {t('adm.downloadcv')} · {Math.round((application.cv_size ?? 0) / 1024)} KB
+                      ↓ {t('adm.downloadcv')} · {formatBytes(application.cv_size ?? 0)}
                     </button>
                   )}
-                  <div className="flex gap-2 mt-3">
+                  <div className="flex flex-wrap gap-2 mt-3">
                     {['shortlisted', 'invited', 'rejected'].map(status => (
                       <button
                         key={status}
-                        className="btn btn-sm"
+                        type="button"
+                        aria-pressed={application.status === status}
+                        className={`btn btn-sm ${application.status === status ? 'btn-primary' : ''}`}
                         onClick={() => inbox.run(
                           () => put(`/admin/applications/${application.id}/status`, { status }),
                           t('adm.saved')
@@ -292,7 +301,7 @@ function PublicationEditor({ rows, onDone }: { rows: Pub[]; onDone: () => void }
   };
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] items-start">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_360px] items-start">
       <div>
         <h2 className="label mb-4">{rows.length} {t('pub.title')}</h2>
         <ul className="space-y-2.5">
@@ -305,8 +314,8 @@ function PublicationEditor({ rows, onDone }: { rows: Pub[]; onDone: () => void }
                   <p className="label mt-1 truncate">{row.authors} · {row.venue}</p>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <button className="btn btn-sm" onClick={() => { setDraft(row); setEditing(row.id); }}>{t('common.edit')}</button>
-                  <button className="btn btn-sm" onClick={() => remove(row.id)}>{t('common.delete')}</button>
+                  <button type="button" className="btn btn-sm" onClick={() => { setDraft(row); setEditing(row.id); }}>{t('common.edit')}</button>
+                  <button type="button" className="btn btn-sm" onClick={() => remove(row.id)}>{t('common.delete')}</button>
                 </div>
               </Card>
             </li>
@@ -317,7 +326,7 @@ function PublicationEditor({ rows, onDone }: { rows: Pub[]; onDone: () => void }
       <Card className="p-6 lg:sticky lg:top-28">
         <h2 className="label mb-4">{editing ? t('common.edit') : t('adm.new')}</h2>
         {notice && <div className="mb-4"><Notice kind={notice.kind}>{notice.text}</Notice></div>}
-        <div className="space-y-4">
+        <form className="space-y-4" onSubmit={e => { e.preventDefault(); save(); }}>
           <Field label={t('pub.sort.title')} required>
             <input className="input" value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} />
           </Field>
@@ -339,14 +348,14 @@ function PublicationEditor({ rows, onDone }: { rows: Pub[]; onDone: () => void }
             <input className="input num" value={draft.doi ?? ''} onChange={e => setDraft({ ...draft, doi: e.target.value })} />
           </Field>
           <div className="flex gap-2">
-            <button className="btn btn-primary flex-1 justify-center" onClick={save} disabled={busy || !draft.title || !draft.authors || !draft.venue}>
+            <button type="submit" className="btn btn-primary flex-1 justify-center" disabled={busy || !draft.title || !draft.authors || !draft.venue}>
               {t('common.save')}
             </button>
             {editing && (
-              <button className="btn" onClick={() => { setDraft(EMPTY_PUB); setEditing(null); }}>{t('common.cancel')}</button>
+              <button type="button" className="btn" onClick={() => { setDraft(EMPTY_PUB); setEditing(null); }}>{t('common.cancel')}</button>
             )}
           </div>
-        </div>
+        </form>
       </Card>
     </div>
   );
@@ -376,7 +385,7 @@ function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
   };
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] items-start">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_380px] items-start">
       <div>
         <h2 className="label mb-4">{rows.length} {t('news.title')}</h2>
         <ul className="space-y-2.5">
@@ -389,8 +398,8 @@ function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
                   <span className="chip mt-1.5">{t(`news.tag.${row.tag}` as any)}</span>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <button className="btn btn-sm" onClick={() => { setDraft(row); setEditing(row.id); }}>{t('common.edit')}</button>
-                  <button className="btn btn-sm" onClick={() => remove(row.id)}>{t('common.delete')}</button>
+                  <button type="button" className="btn btn-sm" onClick={() => { setDraft(row); setEditing(row.id); }}>{t('common.edit')}</button>
+                  <button type="button" className="btn btn-sm" onClick={() => remove(row.id)}>{t('common.delete')}</button>
                 </div>
               </Card>
             </li>
@@ -401,7 +410,7 @@ function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
       <Card className="p-6 lg:sticky lg:top-28">
         <h2 className="label mb-4">{editing ? t('common.edit') : t('adm.new')}</h2>
         {notice && <div className="mb-4"><Notice kind={notice.kind}>{notice.text}</Notice></div>}
-        <div className="space-y-4">
+        <form className="space-y-4" onSubmit={e => { e.preventDefault(); save(); }}>
           <Field label={`${t('adm.newstitle')} ${t('adm.suffixmk')}`} required>
             <input className="input" lang="mk" value={draft.title_mk} onChange={e => setDraft({ ...draft, title_mk: e.target.value })} />
           </Field>
@@ -433,12 +442,12 @@ function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
             </Field>
           </div>
           <div className="flex gap-2">
-            <button className="btn btn-primary flex-1 justify-center" onClick={save} disabled={busy || !draft.title_mk || !draft.title_en}>
+            <button type="submit" className="btn btn-primary flex-1 justify-center" disabled={busy || !draft.title_mk || !draft.title_en}>
               {t('common.save')}
             </button>
-            {editing && <button className="btn" onClick={() => { setDraft(EMPTY_NEWS); setEditing(null); }}>{t('common.cancel')}</button>}
+            {editing && <button type="button" className="btn" onClick={() => { setDraft(EMPTY_NEWS); setEditing(null); }}>{t('common.cancel')}</button>}
           </div>
-        </div>
+        </form>
       </Card>
     </div>
   );
@@ -468,7 +477,7 @@ function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void 
   };
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
       <div>
         <h2 className="label mb-4">{rows.length} {t('team.title')}</h2>
         <ul className="space-y-2.5">
@@ -480,8 +489,8 @@ function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void 
                   <p className="label mt-1">{f(row, 'role')} · {t(`team.seniority.${row.seniority}` as any)}</p>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <button className="btn btn-sm" onClick={() => { setDraft(row); setEditing(row.id); }}>{t('common.edit')}</button>
-                  <button className="btn btn-sm" onClick={() => remove(row.id)}>{t('common.delete')}</button>
+                  <button type="button" className="btn btn-sm" onClick={() => { setDraft(row); setEditing(row.id); }}>{t('common.edit')}</button>
+                  <button type="button" className="btn btn-sm" onClick={() => remove(row.id)}>{t('common.delete')}</button>
                 </div>
               </Card>
             </li>
@@ -492,7 +501,7 @@ function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void 
       <Card className="p-6 lg:sticky lg:top-28">
         <h2 className="label mb-4">{editing ? t('common.edit') : t('adm.new')}</h2>
         {notice && <div className="mb-4"><Notice kind={notice.kind}>{notice.text}</Notice></div>}
-        <div className="space-y-4">
+        <form className="space-y-4" onSubmit={e => { e.preventDefault(); save(); }}>
           <Field label={`${t('common.name')} ${t('adm.suffixmk')}`} required>
             <input className="input" lang="mk" value={draft.name_mk} onChange={e => setDraft({ ...draft, name_mk: e.target.value })} />
           </Field>
@@ -521,12 +530,12 @@ function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void 
             <input className="input" type="email" value={draft.email ?? ''} onChange={e => setDraft({ ...draft, email: e.target.value })} />
           </Field>
           <div className="flex gap-2">
-            <button className="btn btn-primary flex-1 justify-center" onClick={save} disabled={busy || !draft.name_mk || !draft.name_en}>
+            <button type="submit" className="btn btn-primary flex-1 justify-center" disabled={busy || !draft.name_mk || !draft.name_en}>
               {t('common.save')}
             </button>
-            {editing && <button className="btn" onClick={() => { setDraft(EMPTY_PERSON); setEditing(null); }}>{t('common.cancel')}</button>}
+            {editing && <button type="button" className="btn" onClick={() => { setDraft(EMPTY_PERSON); setEditing(null); }}>{t('common.cancel')}</button>}
           </div>
-        </div>
+        </form>
       </Card>
     </div>
   );

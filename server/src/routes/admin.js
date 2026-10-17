@@ -38,8 +38,12 @@ admin.get('/overview', (_req, res) => {
        FROM bookings b
        JOIN instruments i ON i.id = b.instrument_id
        LEFT JOIN users u ON u.id = b.user_id
-       LEFT JOIN people p ON p.id = u.person_id
-       WHERE b.status != 'cancelled' AND b.date >= date('now', 'localtime') ORDER BY b.date, b.start_hour LIMIT 20`).all(),
+       -- Staff without a login still have a profile; match it by address.
+       LEFT JOIN people p ON p.id = COALESCE(u.person_id, (SELECT id FROM people WHERE email = b.user_email))
+       WHERE b.status != 'cancelled'
+         AND (b.date > date('now', 'localtime')
+              OR (b.date = date('now', 'localtime') AND b.end_hour > CAST(strftime('%H', 'now', 'localtime') AS INTEGER)))
+       ORDER BY b.date, b.start_hour LIMIT 20`).all(),
     rsvps: db.prepare(
       `SELECT r.*, e.title_en AS event_en, e.title_mk AS event_mk FROM rsvps r
        JOIN events e ON e.id = r.event_id ORDER BY r.created_at DESC LIMIT 20`).all()
@@ -257,7 +261,10 @@ admin.get('/applications/:id/cv', (req, res) => {
   if (!target.startsWith(resolve(UPLOAD_DIR) + '/')) return res.status(400).json({ error: 'invalid_path' });
   if (!existsSync(target)) return res.status(410).json({ error: 'file_missing' });
 
-  res.download(target, row.cv_filename);
+  // Stored as <timestamp>-<original>; the administrator gets the applicant's
+  // reference and the original name instead of the storage key.
+  const reference = `GL-${String(req.params.id).padStart(5, '0')}`;
+  res.download(target, `${reference}-${row.cv_filename.replace(/^\d+-/, '')}`);
 });
 
 /* ---------------------------------------------------------- INBOX ACTIONS */

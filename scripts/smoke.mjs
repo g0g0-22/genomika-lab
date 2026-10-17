@@ -315,6 +315,7 @@ head('Administration');
   const cv = await req(`/admin/applications/${app.id}/cv`, { token: admin, raw: true });
   const bytes = Buffer.from(await cv.arrayBuffer());
   check('stored CV downloads intact', cv.status === 200 && bytes.subarray(0, 5).toString() === '%PDF-');
+  check('CV is named by application reference', /filename="GL-\d{5}-smoke-cv\.pdf"/.test(cv.headers.get('content-disposition') || ''));
   check('CV download closed to researchers', (await req(`/admin/applications/${app.id}/cv`, { token: researcher, raw: true })).status === 403);
   const msg = ov.data.messages.find(m => m.subject === `Smoke test ${RUN}`);
   check('message marked handled', (await req(`/admin/messages/${msg.id}/handled`, { token: admin, method: 'PUT', body: { handled: true } })).status === 200);

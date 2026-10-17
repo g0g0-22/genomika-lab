@@ -180,7 +180,7 @@ export function Toggle({ options, value, onChange, ariaLabel }: {
   ariaLabel?: string;
 }) {
   return (
-    <div className="inline-flex gap-1.5" role="group" aria-label={ariaLabel}>
+    <div className="inline-flex flex-wrap gap-1.5" role="group" aria-label={ariaLabel}>
       {options.map(o => (
         <button
           key={o.value}

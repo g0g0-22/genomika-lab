@@ -470,6 +470,9 @@ test('an administrator can download a stored CV, and only an administrator', asy
   assert.equal(res.status, 200);
   const body = await res.text();
   assert.match(body, /^%PDF-1\.4/, 'the stored bytes come back');
+  const reference = `GL-${String(row.id).padStart(5, '0')}`;
+  assert.match(res.headers.get('content-disposition'), new RegExp(`filename="${reference}-mycv\\.pdf"`),
+    'named by reference and original name, not by storage key');
 });
 
 test('a CV download is refused for an application that has none', async () => {
@@ -646,6 +649,24 @@ test('a booking that has already ended cannot be cancelled', async () => {
   const res = await json(`/bookings/${id}`, { token, method: 'DELETE' });
   assert.equal(res.status, 409);
   assert.equal(res.body.error, 'booking_finished');
+});
+
+test('the admin overview lists only bookings still to come, named in both languages', async () => {
+  const token = await signIn('admin@genomika.mk');
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  if (now.getHours() > 0) {
+    db.prepare(`INSERT INTO bookings (instrument_id,user_id,user_name,user_email,date,start_hour,end_hour,purpose,status)
+                VALUES ((SELECT id FROM instruments WHERE slug = 'hpc-cluster'),NULL,'Early Bird','early@example.mk',?,0,?,'already over','confirmed')`)
+      .run(today, now.getHours());
+  }
+  const { upcomingBookings } = (await json('/admin/overview', { token })).body;
+  assert.ok(!upcomingBookings.some(b => b.purpose === 'already over'), 'a booking that ended earlier today is not upcoming');
+
+  // Ivana has a staff profile but no login; her booking still carries her Macedonian name.
+  const ivana = upcomingBookings.find(b => b.user_email === 'i.petrushevska@genomika.mk');
+  assert.ok(ivana, 'the seeded booking is listed');
+  assert.match(ivana.user_name_mk, /Ивана/);
 });
 
 test('availability marks the hours that can no longer be booked', async () => {

@@ -37,7 +37,7 @@ booking.get('/instruments/:slug/availability', (req, res) => {
             COALESCE(p.name_en, b.user_name) AS user_name_en
      FROM bookings b
      LEFT JOIN users u ON u.id = b.user_id
-     LEFT JOIN people p ON p.id = u.person_id
+     LEFT JOIN people p ON p.id = COALESCE(u.person_id, (SELECT id FROM people WHERE email = b.user_email))
      WHERE b.instrument_id = ? AND b.date = ? AND b.status != 'cancelled'`
   ).all(instrument.id, date);
 
