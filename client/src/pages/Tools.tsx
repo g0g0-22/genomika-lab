@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useLang } from '../i18n';
 import { PageHeader, Card, Label, DnaStrip } from '../components/ui';
+import { ENZYMES } from '../lib/bio/enzymes';
 import type { DictKey } from '../i18n/dict';
 
 const TOOLS: { to: string; name: DictKey; desc: DictKey; glyph: string; tags: string[] }[] = [
   { to: '/tools/toolkit',     name: 'tool.toolkit.name', desc: 'tool.toolkit.desc', glyph: 'ATG', tags: ['ORF', 'GC%', 'Tm', 'translate'] },
-  { to: '/tools/gel',         name: 'tool.gel.name',     desc: 'tool.gel.desc',     glyph: '≡',   tags: ['EcoRI', 'BamHI', '+18 more'] }
+  { to: '/tools/gel',         name: 'tool.gel.name',     desc: 'tool.gel.desc',     glyph: '≡',   tags: ['EcoRI', 'BamHI', 'HinfI', `+${ENZYMES.length - 3}`] }
 ];
 
 export default function ToolsHub() {

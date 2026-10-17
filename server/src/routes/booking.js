@@ -28,7 +28,13 @@ booking.get('/instruments/:slug/availability', (req, res) => {
   if (!DATE_RE.test(date)) return res.status(400).json({ error: 'invalid_date' });
 
   const rows = db.prepare(
-    "SELECT id, user_name, start_hour, end_hour, purpose, status FROM bookings WHERE instrument_id = ? AND date = ? AND status != 'cancelled'"
+    `SELECT b.id, b.start_hour, b.end_hour, b.purpose, b.status, b.user_name,
+            COALESCE(p.name_mk, b.user_name) AS user_name_mk,
+            COALESCE(p.name_en, b.user_name) AS user_name_en
+     FROM bookings b
+     LEFT JOIN users u ON u.id = b.user_id
+     LEFT JOIN people p ON p.id = u.person_id
+     WHERE b.instrument_id = ? AND b.date = ? AND b.status != 'cancelled'`
   ).all(instrument.id, date);
 
   /*
@@ -44,7 +50,10 @@ booking.get('/instruments/:slug/availability', (req, res) => {
     slots.push({
       hour: h,
       free: !taken,
-      booking: taken && signedIn ? { id: taken.id, user_name: taken.user_name, purpose: taken.purpose } : null
+      booking: taken && signedIn
+        ? { id: taken.id, user_name: taken.user_name, user_name_mk: taken.user_name_mk,
+            user_name_en: taken.user_name_en, purpose: taken.purpose }
+        : null
     });
   }
   res.json({ instrument, date, slots, bookings: signedIn ? rows : [] });
@@ -80,12 +89,19 @@ booking.post('/bookings', requireAuth, (req, res) => {
   ).get(instrument.id, date, e, s);
   if (clash) return res.status(409).json({ error: 'slot_taken', clash });
 
+  // The account is linked to a person whose name is already known in both
+  // languages; reconstructing one from the email address produced names like
+  // "n avramovski". The address is only a fallback for unlinked accounts.
+  const person = req.user.person_id
+    ? db.prepare('SELECT name_en FROM people WHERE id = ?').get(req.user.person_id)
+    : null;
+  const displayName = person?.name_en || req.user.email.split('@')[0];
+
   const info = db.prepare(
     `INSERT INTO bookings (instrument_id,user_id,user_name,user_email,date,start_hour,end_hour,purpose,status)
      VALUES (?,?,?,?,?,?,?,?,'confirmed')`
   ).run(
-    instrument.id, req.user.id,
-    req.user.email.split('@')[0].replace(/[._]/g, ' '),
+    instrument.id, req.user.id, displayName,
     req.user.email, date, s, e, String(purpose || '').slice(0, 300)
   );
 

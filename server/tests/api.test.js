@@ -243,6 +243,17 @@ test('availability discloses occupancy to anyone but identity only to signed-in 
   assert.ok(authed.body.slots.find(s => s.hour === 10).booking.user_name);
 });
 
+test('a booking carries the booker\'s real name in both languages', async () => {
+  const token = await signIn('n.avramovski@genomika.mk');
+  const date = dayFromNow(18);
+  await json('/bookings', { token, method: 'POST',
+    body: { instrument_slug: 'hpc-cluster', date, start_hour: 9, end_hour: 10, purpose: 'name check' } });
+  const slot = (await json(`/instruments/hpc-cluster/availability?date=${date}`, { token })).body.slots.find(s => s.hour === 9);
+  // Previously reconstructed from the address: "n avramovski".
+  assert.equal(slot.booking.user_name_en, 'Nikola Avramovski');
+  assert.equal(slot.booking.user_name_mk, 'Никола Аврамовски');
+});
+
 test('the unauthenticated week endpoint is gone', async () => {
   const { status } = await json(`/bookings/week?from=${dayFromNow(0)}`);
   assert.equal(status, 404);

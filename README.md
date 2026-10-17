@@ -66,20 +66,31 @@ npm run dev:client    # Vite на :5173, со proxy кон :4000
 npm test
 ```
 
-**54 теста** во две нивоа:
+**60 теста** во две нивоа:
 
-* **20** ја покриваат алгоритамската библиотека — парсирање FASTA, транслација, наоѓање отворени рамки на читање и рестрикциска дигестија — со очекувани вредности проверливи наспрема која било референтна имплементација.
-* **34** го возат вистинскиот HTTP слој врз привремена база: автентикација, авторизација, преклопување резервации, валидација на прикачени датотеки, приватност на податоците и пребарување. Ништо не е мокирано.
+* **25** ја покриваат алгоритамската библиотека — парсирање FASTA, транслација, наоѓање отворени рамки на читање и рестрикциска дигестија — со очекувани вредности проверливи наспрема која било референтна имплементација.
+* **35** го возат вистинскиот HTTP слој врз привремена база: автентикација, авторизација, преклопување резервации, валидација на прикачени датотеки, приватност на податоците и пребарување. Ништо не е мокирано.
 
 ```bash
 npm run test:client     # алгоритми
 npm run test:server     # API
+
+# крај-до-крај, врз подигнат стек (nginx → api → волумен)
+BASE_URL=http://localhost:8080 node scripts/smoke.mjs
 ```
 
-**54 tests** at two levels:
+`scripts/smoke.mjs` проверува 108 работи врз вистинската распоредба — секоја
+функционалност од овој документ барем еднаш, вклучително и заглавјата за
+кеширање и компресија што ги поставува nginx. Пишува демо-записи, па се
+извршува само врз стек за еднократна употреба. / Checks 108 things against
+the real deployment — every feature in this document at least once, including
+the caching and compression headers nginx sets. It writes demo records, so run
+it only against a disposable stack.
 
-* **20** cover the algorithm library — FASTA parsing, translation, open-reading-frame detection and restriction digestion — with expected values checkable against any reference implementation.
-* **34** drive the real HTTP layer against a throwaway database: authentication, authorisation, booking overlap, upload validation, data privacy and search. Nothing is mocked.
+**60 tests** at two levels:
+
+* **25** cover the algorithm library — FASTA parsing, translation, open-reading-frame detection and restriction digestion — with expected values checkable against any reference implementation.
+* **35** drive the real HTTP layer against a throwaway database: authentication, authorisation, booking overlap, upload validation, data privacy and search. Nothing is mocked.
 
 ---
 
@@ -130,7 +141,7 @@ Results are checkable against reference implementations:
 genomika-lab/
 ├── server/                  Express + SQLite (better-sqlite3), ESM
 │   └── src/
-│       ├── tests/api.test.js  34 интеграциски теста врз вистинскиот HTTP слој
+│       ├── tests/api.test.js  35 интеграциски теста врз вистинскиот HTTP слој
 │       ├── app.js           Склопување на апликацијата (без слушање порта)
 │       ├── db.js            Шема на базата — 17 табели
 │       ├── seed.js          Двојазични демо податоци
@@ -144,13 +155,13 @@ genomika-lab/
 │           └── admin.js     CRUD зад улога `admin`
 │
 └── client/                  React 18 + TypeScript + Vite + Tailwind v4
-    ├── tests/bio.test.ts    20 теста за алгоритамската библиотека
+    ├── tests/bio.test.ts    25 теста за алгоритамската библиотека
     └── src/
         ├── lib/bio/         ★ Алгоритамска библиотека — без надворешни зависности
         │   ├── sequence.ts    Секвенцни операции, кодонска табела, ORF
         │   ├── enzymes.ts     Рестрикциски ензими, дигестија, миграција на гел
         │   └── samples.ts     Примероци за двете алатки
-        ├── i18n/dict.ts     325 двојазични записи во една рамна табела
+        ├── i18n/dict.ts     331 двојазични записи во една рамна табела
         ├── components/      Дизајн систем, графикони, мрежен граф, приказ на секвенци
         └── pages/           18 страници
 ```

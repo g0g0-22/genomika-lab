@@ -3,6 +3,7 @@ import { useLang } from '../i18n';
 import { useFetch } from '../lib/useFetch';
 import { PageHeader, Card, Label, Loading, ErrorBox, Empty, Toggle, download, CopyButton, accentVar } from '../components/ui';
 import { BarChart } from '../components/charts';
+import { toBibtex } from '../lib/bibtex';
 
 type Pub = {
   id: number; title: string; authors: string; venue: string; year: number;
@@ -12,24 +13,6 @@ type Pub = {
 };
 type Page = { items: Pub[]; total: number; page: number; pages: number; limit: number };
 type Facets = { years: { year: number; n: number }[]; types: { type: string; n: number }[] };
-
-/** Formats one record the way a BibTeX file expects it. */
-function toBibtex(pub: Pub) {
-  const first = pub.authors.split(',')[0].trim().split(' ')[0].toLowerCase();
-  const key = `${first}${pub.year}${pub.title.split(' ')[0].toLowerCase().replace(/\W/g, '')}`;
-  const entry = pub.type === 'conference' ? 'inproceedings' : pub.type === 'preprint' ? 'misc' : 'article';
-  const field = pub.type === 'conference' ? 'booktitle' : 'journal';
-  return [
-    `@${entry}{${key},`,
-    `  title   = {${pub.title}},`,
-    `  author  = {${pub.authors.split(', ').join(' and ')}},`,
-    `  ${field} = {${pub.venue}},`,
-    `  year    = {${pub.year}},`,
-    pub.doi ? `  doi     = {${pub.doi}},` : null,
-    `  note    = {GenomikaLab demonstration record}`,
-    '}'
-  ].filter(Boolean).join('\n');
-}
 
 export default function Publications() {
   const { t, f, formatNumber } = useLang();

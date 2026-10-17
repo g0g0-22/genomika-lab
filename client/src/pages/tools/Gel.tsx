@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLang } from '../../i18n';
 import { ToolShell, Panel, Metric } from '../../components/ToolShell';
 import { SequenceInput } from '../../components/SequenceInput';
@@ -64,24 +64,36 @@ export default function Gel() {
 
   const bandY = (length: number) => 26 + migration(length, minBp, maxBp) * (GEL_HEIGHT - 56);
 
-  /**
+  /*
    * Cut sites cluster — three enzymes inside the first 50 bases of an 800 bp
-   * construct is normal. Stack their labels on as many rows as it takes so no
-   * two ever overlap, rather than rotating them and hoping.
+   * construct is normal. Labels are stacked onto as many rows as it takes so
+   * no two overlap. The calculation uses the track's measured width: on a
+   * phone the same two sites sit a third as far apart as on a desktop, and a
+   * fixed width would let their labels collide there.
    */
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [trackPx, setTrackPx] = useState(760);
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setTrackPx(Math.max(entry.contentRect.width, 1)));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [seq, sites.length]);
+
   const tiers = useMemo(() => {
-    const APPROX_LABEL_PX = 58;
-    const trackPx = 760;
+    const PX_PER_CHAR = 6.4;                 // 10 px label face, plus breathing room
     const lastEndOnTier: number[] = [];
     const of = sites.map(site => {
       const x = (site.position / Math.max(seq.length, 1)) * trackPx;
+      const width = site.enzyme.length * PX_PER_CHAR + 8;
       let tier = lastEndOnTier.findIndex(end => x > end);
-      if (tier === -1) { tier = lastEndOnTier.length; }
-      lastEndOnTier[tier] = x + APPROX_LABEL_PX;
+      if (tier === -1) tier = lastEndOnTier.length;
+      lastEndOnTier[tier] = x + width;
       return tier;
     });
     return { of, count: Math.max(lastEndOnTier.length, 1) };
-  }, [sites, seq.length]);
+  }, [sites, seq.length, trackPx]);
 
   return (
     <ToolShell index="05.2 / GEL" name="tool.gel.name" desc="tool.gel.desc">
@@ -177,7 +189,7 @@ export default function Gel() {
                 {sites.length === 0 ? (
                   <Notice>{t('gel.nosites')}</Notice>
                 ) : (
-                  <div className="relative mt-2" style={{ height: 36 + tiers.count * 16 }}>
+                  <div ref={trackRef} className="relative mt-2" style={{ height: 36 + tiers.count * 16 }}>
                     {/* the sequence itself */}
                     <div
                       className="absolute inset-x-0 h-[6px] bg-bg3 border border-line"

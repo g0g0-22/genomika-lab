@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useLang } from '../i18n';
 import { useTheme } from '../lib/theme';
@@ -90,10 +90,43 @@ function Nav() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
 
+  const panelRef = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => { setOpen(false); }, [location.pathname]);
+
+  /*
+   * The open menu covers the whole page, so it has to behave like a dialog:
+   * focus moves into it, Tab stays inside it, Escape closes it, and focus
+   * returns to the button that opened it. Without this a keyboard or
+   * screen-reader user is left on controls hidden behind the overlay.
+   */
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    if (!open) return () => { document.body.style.overflow = ''; };
+
+    const panel = panelRef.current;
+    const focusable = () => [...(panel?.querySelectorAll<HTMLElement>('a, button') ?? [])];
+    focusable()[0]?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        toggleRef.current?.focus();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = focusable();
+      if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
   }, [open]);
 
   const link = ({ isActive }: { isActive: boolean }) =>
@@ -111,7 +144,7 @@ function Nav() {
             </span>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-7 mx-auto" aria-label="primary">
+          <nav className="hidden lg:flex items-center gap-7 mx-auto" aria-label={t('nav.primary')}>
             {PRIMARY.map(item => (
               <NavLink key={item.to} to={item.to} className={link}>{t(item.key)}</NavLink>
             ))}
@@ -127,9 +160,11 @@ function Nav() {
               <span aria-hidden="true">→</span>
             </Link>
             <button
+              ref={toggleRef}
               className="lg:hidden text-ink p-1 -mr-1"
               onClick={() => setOpen(o => !o)}
               aria-expanded={open}
+              aria-controls="mobile-menu"
               aria-label={t('nav.menu')}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
@@ -143,8 +178,15 @@ function Nav() {
 
       {/* Full-height panel on small screens — the complete index, not a stub. */}
       {open && (
-        <div className="lg:hidden fixed inset-x-0 top-16 bottom-0 bg-bg border-t border-line overflow-y-auto fade">
-          <nav className="px-6 py-10" aria-label="mobile">
+        <div
+          ref={panelRef}
+          id="mobile-menu"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('nav.menu')}
+          className="lg:hidden fixed inset-x-0 top-16 bottom-0 bg-bg border-t border-line overflow-y-auto fade"
+        >
+          <nav className="px-6 py-10" aria-label={t('nav.menu')}>
             <ul className="space-y-5">
               {PRIMARY.map(item => (
                 <li key={item.to}>

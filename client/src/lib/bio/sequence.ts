@@ -105,6 +105,17 @@ export function gcContent(seq: string) {
 const DNA_RESIDUE_MASS: Record<string, number> = { A: 313.21, T: 304.20, G: 329.21, C: 289.18, N: 308.95 };
 const RNA_RESIDUE_MASS: Record<string, number> = { A: 329.21, U: 306.17, G: 345.21, C: 305.18, N: 321.44 };
 
+/**
+ * Mass in the unit a person would expect to read it in. Rounding everything to
+ * whole kilodaltons made a 12-mer read "4 kDa" and a primer read "0 kDa" —
+ * exactly the short sequences for which mass is actually used.
+ */
+export function formatMass(daltons: number): { value: number; unit: 'Da' | 'kDa'; digits: number } {
+  return daltons < 10_000
+    ? { value: daltons, unit: 'Da', digits: 1 }
+    : { value: daltons / 1000, unit: 'kDa', digits: 2 };
+}
+
 export function molecularWeight(seq: string) {
   if (!seq.length) return 0;
   const table = seq.includes('U') && !seq.includes('T') ? RNA_RESIDUE_MASS : DNA_RESIDUE_MASS;
@@ -116,6 +127,14 @@ export function molecularWeight(seq: string) {
  * Melting temperature. Under 14 bases the Wallace rule applies; above it the
  * GC-based formula gives a far better estimate.
  */
+/**
+ * Both formulas are oligonucleotide estimates. Past roughly fifty bases the
+ * GC formula stops describing anything physical — a gene does not melt at a
+ * single temperature — so callers should not present a value beyond this.
+ */
+export const TM_MAX_LENGTH = 50;
+export const meltingTempApplies = (seq: string) => seq.length > 0 && seq.length <= TM_MAX_LENGTH;
+
 export function meltingTemp(seq: string) {
   const n = seq.length;
   if (!n) return 0;

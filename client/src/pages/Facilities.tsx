@@ -13,7 +13,7 @@ type Instrument = {
   name_mk: string; name_en: string; description_mk: string; description_en: string;
 };
 
-type Slot = { hour: number; free: boolean; booking: { id: number; user_name: string; purpose: string } | null };
+type Slot = { hour: number; free: boolean; booking: { id: number; user_name: string; user_name_mk: string; user_name_en: string; purpose: string } | null };
 type Availability = { instrument: Instrument; date: string; slots: Slot[] };
 type Booking = {
   id: number; date: string; start_hour: number; end_hour: number; purpose: string; status: string;
@@ -209,7 +209,7 @@ export default function Facilities() {
                         disabled={!slot.free || instrument.status !== 'available'}
                         aria-pressed={selected}
                         title={slot.booking
-                          ? `${slot.booking.user_name} — ${slot.booking.purpose ?? ''}`
+                          ? `${f(slot.booking, 'user_name')} — ${slot.booking.purpose ?? ''}`
                           : slot.free ? t('fac.freeslot') : t('fac.taken')}
                         className={`px-2 py-3 rounded-xs border text-center transition-colors ${
                           selected

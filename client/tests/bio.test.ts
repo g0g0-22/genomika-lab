@@ -12,8 +12,9 @@ import assert from 'node:assert/strict';
 import {
   reverseComplement, complement, transcribe, translate, translateAllFrames, findOrfs,
   gcContent, meltingTemp, molecularWeight, parseFasta, cleanSequence, detectKind, toFasta,
-  IUPAC_DNA_ALPHABET
+  IUPAC_DNA_ALPHABET, formatMass, meltingTempApplies
 } from '../src/lib/bio/sequence.ts';
+import { bibtexAuthors, latexEscape, toBibtex } from '../src/lib/bibtex.ts';
 import { ENZYMES, findCutSites, digest, migration, recognitionSequence } from '../src/lib/bio/enzymes.ts';
 import { HBB_CDS, PLASMID_FRAGMENT } from '../src/lib/bio/samples.ts';
 
@@ -181,4 +182,46 @@ test('an uncut sequence yields a single full-length fragment', () => {
 
 test('gel migration is monotonic: longer fragments travel less', () => {
   assert.ok(migration(10000, 400, 10000) < migration(500, 400, 10000));
+});
+
+/* --------------------------------------------------------------- display -- */
+
+test('mass is shown in daltons for oligos and kilodaltons for longer chains', () => {
+  // A 12-mer used to read "4 kDa"; a short primer read "0 kDa".
+  const oligo = formatMass(molecularWeight('ATGCCCGGGTAA'));
+  assert.equal(oligo.unit, 'Da');
+  assert.ok(oligo.value > 3600 && oligo.value < 3700);
+
+  const gene = formatMass(molecularWeight(HBB_CDS));
+  assert.equal(gene.unit, 'kDa');
+  assert.ok(gene.value > 137 && gene.value < 138);
+});
+
+test('a melting temperature is only offered where the formula applies', () => {
+  assert.equal(meltingTempApplies('ACGTACGTACGTACGTACGT'), true);
+  assert.equal(meltingTempApplies(HBB_CDS), false, 'a 444-nt gene does not melt at one temperature');
+  assert.equal(meltingTempApplies(''), false);
+});
+
+/* ---------------------------------------------------------------- BibTeX -- */
+
+test('BibTeX authors use the unambiguous "Surname, Initial." form', () => {
+  // Without the comma BibTeX reads "Trajkovska A" as given name Trajkovska, surname A.
+  assert.equal(bibtexAuthors('Trajkovska A, Stefanovski M'), 'Trajkovska, A. and Stefanovski, M.');
+  assert.equal(bibtexAuthors('Tester T'), 'Tester, T.');
+});
+
+test('BibTeX fields escape LaTeX command characters', () => {
+  assert.equal(latexEscape('R&D at 50% #1 $x_y'), 'R\\&D at 50\\% \\#1 \\$x\\_y');
+  const bib = toBibtex({ title: 'Speed & accuracy', authors: 'Doe J', venue: 'J. Test & Eval.', year: 2025, type: 'article' });
+  assert.match(bib, /title\s+= \{Speed \\& accuracy\}/);
+  assert.match(bib, /journal = \{J\. Test \\& Eval\.\}/);
+  assert.ok(!/[^\\]&/.test(bib.replace(/\\&/g, '')), 'no bare ampersand survives');
+});
+
+test('BibTeX entry type and venue field follow the publication type', () => {
+  const base = { title: 'T', authors: 'Doe J', venue: 'V', year: 2024 };
+  assert.match(toBibtex({ ...base, type: 'article' }), /^@article\{[\s\S]*journal = \{V\}/);
+  assert.match(toBibtex({ ...base, type: 'conference' }), /^@inproceedings\{[\s\S]*booktitle = \{V\}/);
+  assert.match(toBibtex({ ...base, type: 'preprint' }), /^@misc\{[\s\S]*howpublished = \{V\}/);
 });

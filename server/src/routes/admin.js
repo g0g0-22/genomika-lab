@@ -30,8 +30,13 @@ admin.get('/overview', (_req, res) => {
        JOIN positions p ON p.id = a.position_id ORDER BY a.created_at DESC LIMIT 20`).all(),
     messages: db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT 20').all(),
     upcomingBookings: db.prepare(
-      `SELECT b.*, i.name_en AS instrument_en, i.name_mk AS instrument_mk FROM bookings b
+      `SELECT b.*, i.name_en AS instrument_en, i.name_mk AS instrument_mk,
+              COALESCE(p.name_mk, b.user_name) AS user_name_mk,
+              COALESCE(p.name_en, b.user_name) AS user_name_en
+       FROM bookings b
        JOIN instruments i ON i.id = b.instrument_id
+       LEFT JOIN users u ON u.id = b.user_id
+       LEFT JOIN people p ON p.id = u.person_id
        WHERE b.status != 'cancelled' AND b.date >= date('now') ORDER BY b.date, b.start_hour LIMIT 20`).all(),
     rsvps: db.prepare(
       `SELECT r.*, e.title_en AS event_en, e.title_mk AS event_mk FROM rsvps r

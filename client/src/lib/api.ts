@@ -49,3 +49,29 @@ export const post = <T = any>(path: string, body: unknown) =>
 export const put = <T = any>(path: string, body: unknown) =>
   api<T>(path, { method: 'PUT', body: JSON.stringify(body) });
 export const del = <T = any>(path: string) => api<T>(path, { method: 'DELETE' });
+
+/**
+ * Downloads a protected file. A plain <a href> cannot be used for these: the
+ * browser follows a link without the Authorization header, so the server
+ * sees an anonymous request and refuses it. The file is fetched with the
+ * token instead and handed to the browser as a local object URL.
+ */
+export async function downloadProtected(path: string, fallbackName: string) {
+  const token = getToken();
+  const res = await fetch(BASE + path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) {
+    let code = `http_${res.status}`;
+    try { code = (await res.json()).error || code; } catch { /* not JSON */ }
+    throw new ApiError(res.status, code);
+  }
+  const disposition = res.headers.get('content-disposition') || '';
+  const name = disposition.match(/filename="?([^";]+)"?/)?.[1] || fallbackName;
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

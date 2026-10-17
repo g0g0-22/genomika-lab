@@ -3,14 +3,14 @@ import { Link } from 'react-router-dom';
 import { useLang } from '../../i18n';
 import { useAuth } from '../../lib/auth';
 import { useFetch } from '../../lib/useFetch';
-import { post, put, del, ApiError } from '../../lib/api';
+import { post, put, del, ApiError, downloadProtected } from '../../lib/api';
 import { PageHeader, Card, Label, Loading, ErrorBox, Empty, Toggle, Field, Notice, Stat } from '../../components/ui';
 
 type Overview = {
   counts: Record<string, number>;
   recentApplications: { id: number; name: string; email: string; motivation: string; cv_filename: string | null; cv_size: number | null; status: string; created_at: string; position_en: string; position_mk: string }[];
   messages: { id: number; name: string; email: string; subject: string; body: string; handled: number; created_at: string }[];
-  upcomingBookings: { id: number; user_name: string; date: string; start_hour: number; end_hour: number; purpose: string; instrument_en: string; instrument_mk: string }[];
+  upcomingBookings: { id: number; user_name: string; user_name_mk: string; user_name_en: string; date: string; start_hour: number; end_hour: number; purpose: string; instrument_en: string; instrument_mk: string }[];
   rsvps: { id: number; name: string; email: string; created_at: string; event_en: string; event_mk: string }[];
 };
 
@@ -135,7 +135,7 @@ export default function Admin() {
                         <span className="num text-[12px] text-accent w-20">{formatDate(booking.date, { day: '2-digit', month: 'short' })}</span>
                         <span className="num text-[12px] w-24">{String(booking.start_hour).padStart(2, '0')}:00–{String(booking.end_hour).padStart(2, '0')}:00</span>
                         <span className="text-[13px] flex-1 min-w-[140px] truncate">{f(booking, 'instrument')}</span>
-                        <span className="label truncate">{booking.user_name}</span>
+                        <span className="label truncate">{f(booking, 'user_name')}</span>
                       </li>
                     ))}
                   </ul>
@@ -182,7 +182,7 @@ export default function Admin() {
               {overview.data.recentApplications.map(application => (
                 <li key={application.id} className="card p-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="chip chip-on">{application.status}</span>
+                    <span className="chip chip-on">{t(`adm.status.${application.status}` as any)}</span>
                     <span className="label ml-auto">{formatDate(application.created_at, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                   </div>
                   <h3 className="mt-2.5 text-[15px]">{application.name}</h3>
@@ -190,13 +190,16 @@ export default function Admin() {
                   <p className="label mt-1.5">{f(application, 'position')}</p>
                   <p className="mt-2.5 text-[13px] leading-relaxed text-ink2 line-clamp-3">{application.motivation}</p>
                   {application.cv_filename && (
-                    <a
+                    <button
                       className="btn btn-sm mt-3"
-                      href={`/api/admin/applications/${application.id}/cv`}
-                      download
+                      onClick={() => inbox.run(
+                        () => downloadProtected(`/admin/applications/${application.id}/cv`, 'cv.pdf'),
+                        t('adm.downloadcv')
+                      )}
+                      disabled={inbox.busy}
                     >
                       ↓ {t('adm.downloadcv')} · {Math.round((application.cv_size ?? 0) / 1024)} KB
-                    </a>
+                    </button>
                   )}
                   <div className="flex gap-2 mt-3">
                     {['shortlisted', 'invited', 'rejected'].map(status => (
@@ -209,7 +212,7 @@ export default function Admin() {
                         )}
                         disabled={inbox.busy}
                       >
-                        {status}
+                        {t(`adm.status.${status}` as any)}
                       </button>
                     ))}
                   </div>
@@ -377,7 +380,7 @@ function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
                 <span className="label w-24 shrink-0">{formatDate(row.date, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-[14px] leading-snug">{f(row, 'title')}</h3>
-                  <span className="chip mt-1.5">{row.tag}</span>
+                  <span className="chip mt-1.5">{t(`news.tag.${row.tag}` as any)}</span>
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button className="btn btn-sm" onClick={() => { setDraft(row); setEditing(row.id); }}>{t('common.edit')}</button>
@@ -418,7 +421,7 @@ function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
             <Field label={t('adm.tag')}>
               <select className="input" value={draft.tag} onChange={e => setDraft({ ...draft, tag: e.target.value })}>
                 {['news', 'publication', 'grant', 'outreach', 'facility', 'award', 'people'].map(tag => (
-                  <option key={tag} value={tag}>{tag}</option>
+                  <option key={tag} value={tag}>{t(`news.tag.${tag}` as any)}</option>
                 ))}
               </select>
             </Field>
@@ -468,7 +471,7 @@ function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void 
               <Card className="p-4 flex flex-wrap items-baseline gap-4">
                 <div className="min-w-0 flex-1">
                   <h3 className="text-[14px]">{f(row, 'name')}</h3>
-                  <p className="label mt-1">{f(row, 'role')} · {row.seniority}</p>
+                  <p className="label mt-1">{f(row, 'role')} · {t(`team.seniority.${row.seniority}` as any)}</p>
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button className="btn btn-sm" onClick={() => { setDraft(row); setEditing(row.id); }}>{t('common.edit')}</button>
@@ -499,7 +502,9 @@ function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void 
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('adm.seniority')}>
               <select className="input" value={draft.seniority} onChange={e => setDraft({ ...draft, seniority: e.target.value })}>
-                {['faculty', 'postdoc', 'staff', 'phd', 'msc'].map(level => <option key={level} value={level}>{level}</option>)}
+                {['faculty', 'postdoc', 'staff', 'phd', 'msc'].map(level => (
+                  <option key={level} value={level}>{t(`team.seniority.${level}` as any)}</option>
+                ))}
               </select>
             </Field>
             <Field label={t('team.since')}>

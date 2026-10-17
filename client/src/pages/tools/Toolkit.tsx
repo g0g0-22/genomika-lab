@@ -8,7 +8,7 @@ import { Toggle, CopyButton, download, Empty } from '../../components/ui';
 import {
   parseFasta, cleanSequence, detectKind, reverseComplement, complement, reverse,
   transcribe, translate, translateAllFrames, findOrfs, gcContent, baseCounts,
-  molecularWeight, meltingTemp, toFasta
+  molecularWeight, meltingTemp, meltingTempApplies, formatMass, toFasta
 } from '../../lib/bio/sequence';
 import { HBB_CDS } from '../../lib/bio/samples';
 
@@ -33,6 +33,7 @@ export default function Toolkit() {
   }, [input]);
 
   const kind = detectKind(seq);
+  const mass = formatMass(molecularWeight(seq));
   const counts = useMemo(() => baseCounts(seq), [seq]);
   const orfs = useMemo(() => (seq ? findOrfs(seq, minAa) : []), [seq, minAa]);
   const frames = useMemo(() => (seq ? translateAllFrames(seq) : []), [seq]);
@@ -194,8 +195,21 @@ export default function Toolkit() {
               <div className="grid grid-cols-2 gap-y-5 gap-x-4">
                 <Metric label={t('seq.length')} value={formatNumber(seq.length)} unit="nt" />
                 <Metric label={t('seq.gc')} value={`${(gcContent(seq) * 100).toFixed(1)}`} unit="%" />
-                <Metric label={t('seq.tm')} value={meltingTemp(seq).toFixed(1)} unit="°C" />
-                <Metric label={t('seq.mw')} value={formatNumber(Math.round(molecularWeight(seq) / 1000))} unit="kDa" />
+                <Metric
+                  label={t('seq.tm')}
+                  value={meltingTempApplies(seq) ? meltingTemp(seq).toFixed(1) : '—'}
+                  unit={meltingTempApplies(seq) ? '°C' : undefined}
+                />
+                <Metric
+                  label={t('seq.mw')}
+                  value={formatNumber(mass.value, { minimumFractionDigits: mass.digits, maximumFractionDigits: mass.digits })}
+                  unit={mass.unit}
+                />
+                {!meltingTempApplies(seq) && (
+                  <p className="col-span-2 text-[11.5px] leading-relaxed text-muted -mt-2">
+                    {t('seq.tmlimit')}
+                  </p>
+                )}
                 <div className="col-span-2">
                   <div className="label mb-2">{t('common.type')}</div>
                   <span className="chip chip-on uppercase">{kind}</span>
