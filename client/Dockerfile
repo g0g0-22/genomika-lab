@@ -13,7 +13,9 @@ FROM nginx:1.27-alpine AS runtime
 COPY --from=build /build/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY security-headers.conf /etc/nginx/snippets/security-headers.conf
-COPY --chmod=755 trusted-proxies.sh /docker-entrypoint.d/40-trusted-proxies.sh
+# Plain COPY + chmod rather than COPY --chmod: the platform builds without BuildKit.
+COPY trusted-proxies.sh /docker-entrypoint.d/40-trusted-proxies.sh
+RUN chmod 755 /docker-entrypoint.d/40-trusted-proxies.sh
 
 EXPOSE 80
 

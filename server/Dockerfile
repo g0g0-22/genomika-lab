@@ -31,7 +31,9 @@ COPY src ./src
 # nowhere else, so rebuilding the image never destroys it. The entrypoint
 # starts as root, gives /data to the node user and drops to it (see the script).
 RUN mkdir -p /data && chown -R node:node /data /app
-COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+# Plain COPY + chmod rather than COPY --chmod: the platform builds without BuildKit.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod 755 /usr/local/bin/docker-entrypoint.sh
 ENTRYPOINT ["docker-entrypoint.sh"]
 
 EXPOSE 4000
