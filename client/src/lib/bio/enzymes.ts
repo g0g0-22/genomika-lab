@@ -9,41 +9,40 @@ export type Enzyme = {
   name: string;
   site: string;        // with '^' marking the cut, e.g. "G^AATTC"
   supplier: string;
-  overhang: "5'" | "3'" | 'blunt';
 };
 
 export const ENZYMES: Enzyme[] = [
-  { name: 'EcoRI',   site: 'G^AATTC',   supplier: 'E. coli RY13',        overhang: "5'" },
-  { name: 'BamHI',   site: 'G^GATCC',   supplier: 'B. amyloliquefaciens', overhang: "5'" },
-  { name: 'HindIII', site: 'A^AGCTT',   supplier: 'H. influenzae Rd',    overhang: "5'" },
-  { name: 'PstI',    site: 'CTGCA^G',   supplier: 'P. stuartii',         overhang: "3'" },
-  { name: 'SmaI',    site: 'CCC^GGG',   supplier: 'S. marcescens',       overhang: 'blunt' },
-  { name: 'XhoI',    site: 'C^TCGAG',   supplier: 'X. holcicola',        overhang: "5'" },
-  { name: 'SalI',    site: 'G^TCGAC',   supplier: 'S. albus',            overhang: "5'" },
-  { name: 'KpnI',    site: 'GGTAC^C',   supplier: 'K. pneumoniae',       overhang: "3'" },
-  { name: 'SacI',    site: 'GAGCT^C',   supplier: 'S. achromogenes',     overhang: "3'" },
-  { name: 'PvuII',   site: 'CAG^CTG',   supplier: 'P. vulgaris',         overhang: 'blunt' },
-  { name: 'EcoRV',   site: 'GAT^ATC',   supplier: 'E. coli J62',         overhang: 'blunt' },
-  { name: 'NcoI',    site: 'C^CATGG',   supplier: 'N. corallina',        overhang: "5'" },
-  { name: 'XbaI',    site: 'T^CTAGA',   supplier: 'X. badrii',           overhang: "5'" },
-  { name: 'SpeI',    site: 'A^CTAGT',   supplier: 'S. pyogenes',         overhang: "5'" },
-  { name: 'NdeI',    site: 'CA^TATG',   supplier: 'N. denitrificans',    overhang: "5'" },
-  { name: 'BglII',   site: 'A^GATCT',   supplier: 'B. globigii',         overhang: "5'" },
-  { name: 'NotI',    site: 'GC^GGCCGC', supplier: 'N. otitidis',         overhang: "5'" },
-  { name: 'HaeIII',  site: 'GG^CC',     supplier: 'H. aegyptius',        overhang: 'blunt' },
-  { name: 'AluI',    site: 'AG^CT',     supplier: 'A. luteus',           overhang: 'blunt' },
-  { name: 'TaqI',    site: 'T^CGA',     supplier: 'T. aquaticus',        overhang: "5'" },
+  { name: 'EcoRI',   site: 'G^AATTC',   supplier: 'E. coli RY13' },
+  { name: 'BamHI',   site: 'G^GATCC',   supplier: 'B. amyloliquefaciens' },
+  { name: 'HindIII', site: 'A^AGCTT',   supplier: 'H. influenzae Rd' },
+  { name: 'PstI',    site: 'CTGCA^G',   supplier: 'P. stuartii' },
+  { name: 'SmaI',    site: 'CCC^GGG',   supplier: 'S. marcescens' },
+  { name: 'XhoI',    site: 'C^TCGAG',   supplier: 'X. holcicola' },
+  { name: 'SalI',    site: 'G^TCGAC',   supplier: 'S. albus' },
+  { name: 'KpnI',    site: 'GGTAC^C',   supplier: 'K. pneumoniae' },
+  { name: 'SacI',    site: 'GAGCT^C',   supplier: 'S. achromogenes' },
+  { name: 'PvuII',   site: 'CAG^CTG',   supplier: 'P. vulgaris' },
+  { name: 'EcoRV',   site: 'GAT^ATC',   supplier: 'E. coli J62' },
+  { name: 'NcoI',    site: 'C^CATGG',   supplier: 'N. corallina' },
+  { name: 'XbaI',    site: 'T^CTAGA',   supplier: 'X. badrii' },
+  { name: 'SpeI',    site: 'A^CTAGT',   supplier: 'S. pyogenes' },
+  { name: 'NdeI',    site: 'CA^TATG',   supplier: 'N. denitrificans' },
+  { name: 'BglII',   site: 'A^GATCT',   supplier: 'B. globigii' },
+  { name: 'NotI',    site: 'GC^GGCCGC', supplier: 'N. otitidis' },
+  { name: 'HaeIII',  site: 'GG^CC',     supplier: 'H. aegyptius' },
+  { name: 'AluI',    site: 'AG^CT',     supplier: 'A. luteus' },
+  { name: 'TaqI',    site: 'T^CGA',     supplier: 'T. aquaticus' },
 
   /*
    * The five below recognise degenerate sites, written in IUPAC notation:
    * N is any base, W is A or T, Y is C or T, R is A or G. They are what the
    * IUPAC table below is for — without them the expansion is dead code.
    */
-  { name: 'HinfI',   site: 'G^ANTC',    supplier: 'H. influenzae Rf',    overhang: "5'" },
-  { name: 'AvaII',   site: 'G^GWCC',    supplier: 'A. variabilis',       overhang: "5'" },
-  { name: 'BstYI',   site: 'R^GATCY',   supplier: 'B. stearothermophilus', overhang: "5'" },
-  { name: 'DdeI',    site: 'C^TNAG',    supplier: 'D. desulfuricans',    overhang: "5'" },
-  { name: 'ScrFI',   site: 'CC^NGG',    supplier: 'S. cremoris',         overhang: 'blunt' }
+  { name: 'HinfI',   site: 'G^ANTC',    supplier: 'H. influenzae Rf' },
+  { name: 'AvaII',   site: 'G^GWCC',    supplier: 'A. variabilis' },
+  { name: 'BstYI',   site: 'R^GATCY',   supplier: 'B. stearothermophilus' },
+  { name: 'DdeI',    site: 'C^TNAG',    supplier: 'D. desulfuricans' },
+  { name: 'ScrFI',   site: 'CC^NGG',    supplier: 'S. cremoris' }
 ];
 
 const IUPAC: Record<string, string> = {
@@ -54,6 +53,18 @@ const IUPAC: Record<string, string> = {
 
 export const recognitionSequence = (enzyme: Enzyme) => enzyme.site.replace('^', '');
 export const cutOffset = (enzyme: Enzyme) => enzyme.site.indexOf('^');
+
+/**
+ * The end a cut leaves, derived from the site rather than stored beside it
+ * (a stored value had ScrFI as blunt). Every site here is palindromic, so the
+ * bottom strand is cut at the mirror position: a top-strand cut left of the
+ * centre leaves a 5′ overhang, right of it a 3′ overhang, on it a blunt end.
+ */
+export function overhang(enzyme: Enzyme): "5'" | "3'" | 'blunt' {
+  const top = cutOffset(enzyme);
+  const bottom = recognitionSequence(enzyme).length - top;
+  return top < bottom ? "5'" : top > bottom ? "3'" : 'blunt';
+}
 
 function siteRegex(enzyme: Enzyme) {
   const pattern = recognitionSequence(enzyme).split('').map(c => IUPAC[c] ?? c).join('');
@@ -66,7 +77,7 @@ export type CutSite = {
   siteStart: number;
   /** 0-based index of the phosphodiester bond that is broken on the top strand. */
   position: number;
-  overhang: Enzyme['overhang'];
+  overhang: ReturnType<typeof overhang>;
 };
 
 /**
@@ -95,7 +106,7 @@ export function findCutSites(seq: string, enzymes: Enzyme[], circular = false): 
         enzyme: enzyme.name,
         siteStart: m.index,
         position: circular ? (m.index + offset) % n : m.index + offset,
-        overhang: enzyme.overhang
+        overhang: overhang(enzyme)
       });
       regex.lastIndex = m.index + 1;           // allow overlapping sites
     }

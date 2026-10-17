@@ -1,5 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { useLang } from '../i18n';
+import { initials } from '../lib/names';
 import { useFetch } from '../lib/useFetch';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { Card, Label, Loading, ErrorBox, NotFound, Crumb, DnaStrip, accentVar } from '../components/ui';
@@ -15,7 +16,7 @@ type Detail = {
 
 export default function GroupDetail() {
   const { slug } = useParams();
-  const { t, f, s, formatDate } = useLang();
+  const { t, f, s, formatDate, tv } = useLang();
   const { data, loading, error, reload } = useFetch<Detail>(`/groups/${slug}`, [slug]);
   useDocumentTitle(data ? f(data, 'name') : null);
 
@@ -49,7 +50,7 @@ export default function GroupDetail() {
                 <Card key={project.id} className="p-5">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <span className="chip" style={{ borderColor: accent, color: accent }}>
-                      {t(`research.status.${project.status}` as any)}
+                      {tv('research.status', project.status)}
                     </span>
                     <span className="chip">{s(project.funder)}</span>
                   </div>
@@ -99,7 +100,7 @@ export default function GroupDetail() {
                       style={{ background: `oklch(0.88 0.045 ${person.hue})`, color: 'var(--ink)' }}
                       aria-hidden="true"
                     >
-                      {f(person, 'name').replace(/^(проф\.|д-р|Prof\.|Dr\.)\s*/i, '').split(' ').map(w => w[0]).slice(0, 2).join('')}
+                      {initials(f(person, 'name'))}
                     </span>
                     <span className="min-w-0">
                       <span className="block text-[13px] leading-snug truncate">{f(person, 'name')}</span>

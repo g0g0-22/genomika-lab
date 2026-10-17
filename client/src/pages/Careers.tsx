@@ -16,7 +16,7 @@ const ALLOWED = ['application/pdf', 'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
 
 function ApplicationForm({ position }: { position: Position }) {
-  const { t } = useLang();
+  const { t, tv } = useLang();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [motivation, setMotivation] = useState('');
@@ -69,10 +69,10 @@ function ApplicationForm({ position }: { position: Position }) {
 
   return (
     <form onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-2 rise">
-      <Field label={t('common.name')} required error={fieldError(t, errors.name)}>
+      <Field label={t('common.name')} required error={fieldError(tv, errors.name)}>
         <input className="input" value={name} onChange={e => setName(e.target.value)} required minLength={2} />
       </Field>
-      <Field label={t('common.email')} required error={fieldError(t, errors.email)}>
+      <Field label={t('common.email')} required error={fieldError(tv, errors.email)}>
         <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
       </Field>
 
@@ -81,7 +81,7 @@ function ApplicationForm({ position }: { position: Position }) {
           label={t('car.motivation')}
           required
           hint={`${motivation.length} ${t('common.chars')} · min 40`}
-          error={fieldError(t, errors.motivation)}
+          error={fieldError(tv, errors.motivation)}
         >
           <textarea
             className="input"
@@ -97,7 +97,7 @@ function ApplicationForm({ position }: { position: Position }) {
       </div>
 
       <div className="md:col-span-2">
-        <Field label={`${t('car.cv')} (${t('common.optional')})`} error={fieldError(t, errors.cv)}>
+        <Field label={`${t('car.cv')} (${t('common.optional')})`} error={fieldError(tv, errors.cv)}>
           <div className="flex flex-wrap items-center gap-3">
             <input
               type="file"
@@ -120,7 +120,7 @@ function ApplicationForm({ position }: { position: Position }) {
 }
 
 export default function Careers() {
-  const { t, f, formatDate } = useLang();
+  const { t, f, formatDate, tv } = useLang();
   const [open, setOpen] = useState<number | null>(null);
   const positions = useFetch<Position[]>('/positions');
 
@@ -141,7 +141,7 @@ export default function Careers() {
                 <span className={`chip ${position.is_open ? 'chip-on' : ''}`}>
                   {position.is_open ? t('car.open') : t('car.closed')}
                 </span>
-                <span className="chip">{t(`car.kind.${position.kind}` as any)}</span>
+                <span className="chip">{tv('car.kind', position.kind)}</span>
                 {position.group_slug && (
                   <span className="chip" style={{ borderColor: accentVar(position.accent), color: accentVar(position.accent) }}>
                     {f(position, 'group_name')}

@@ -10,22 +10,20 @@
  * README advertises is exercised at least once. It writes demo records, so run
  * it against a disposable stack, never a live one with real data.
  *
- * It can be run repeatedly against the same stack. Every record it creates
- * carries this run's id, every booking it makes is cancelled again, and every
- * request presents itself as one fresh client (X-Forwarded-For) so the
- * per-client rate limits an earlier run used up do not carry over. That last
- * part relies on the request reaching the api through private-network proxies
- * it trusts, which is the case for a local stack.
+ * Every record it creates carries this run's id and every booking it makes is
+ * cancelled again, so runs do not collide. It is one client, as far as the
+ * stack can tell, and its last section deliberately uses up that client's
+ * sign-in and form allowances to prove the limits exist. A second run before
+ * those windows close (one and ten minutes) stops at the first refusal and
+ * says so.
  */
 const BASE = (process.env.BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
 const API = `${BASE}/api`;
-const PASSWORD = process.env.DEMO_PASSWORD || 'genomika2026';
+// The stack's own seeded passwords (see server/src/lib/demo.js).
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'genomika2026';
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'genomika2026';
 
 const RUN = Date.now().toString(36);
-const octet = () => Math.floor(Math.random() * 254) + 1;
-// 198.18.0.0/15 is reserved for benchmarking, so it never names a real client.
-const fakeClient = () => `198.${18 + (octet() % 2)}.${octet()}.${octet()}`;
-const CLIENT = fakeClient();
 const applicant = `applicant-${RUN}@example.mk`;
 
 let passed = 0, failed = 0;
@@ -38,25 +36,33 @@ const check = (label, ok, detail = '') => {
   else { failed++; failures.push(`${section} — ${label}${detail ? ` (${detail})` : ''}`); console.log(`  ✗ ${label}${detail ? `  — ${detail}` : ''}`); }
 };
 
-async function req(path, { token, method = 'GET', body, raw = false, headers = {}, client = CLIENT } = {}) {
+let limitsExpected = false;
+
+async function req(path, { token, method = 'GET', body, raw = false, headers = {} } = {}) {
   const url = path.startsWith('http') ? path : API + path;
   const res = await fetch(url, {
     method,
     headers: {
-      'X-Forwarded-For': client,
       ...(body ? { 'Content-Type': 'application/json' } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...headers
     },
     ...(body ? { body: JSON.stringify(body) } : {})
   });
+  if (res.status === 429 && !limitsExpected) {
+    const wait = res.headers.get('retry-after');
+    console.log(`\nRefused with 429 at ${method} ${path}: the rate-limit window from an earlier run is still open.`);
+    console.log(`Run again ${wait ? `in ${wait} s` : 'in a few minutes'}.`);
+    process.exit(2);
+  }
   if (raw) return res;
   let data = null;
   try { data = await res.json(); } catch { /* not JSON */ }
   return { status: res.status, data, headers: res.headers };
 }
 
-const login = async (email) => (await req('/auth/login', { method: 'POST', body: { email, password: PASSWORD } })).data?.token;
+const login = async (email) => (await req('/auth/login', { method: 'POST',
+  body: { email, password: email.startsWith('admin@') || email.startsWith('f.') ? ADMIN_PASSWORD : DEMO_PASSWORD } })).data?.token;
 const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 const pdf = (text) => `data:application/pdf;base64,${Buffer.concat([Buffer.from('%PDF-1.4 '), Buffer.from(text)]).toString('base64')}`;
 
@@ -131,7 +137,7 @@ head('Research, team and content');
   check('collaboration network has nodes and links', net?.nodes?.length > 10 && net?.links?.length > 10);
   check('every network link points at an existing node', net.links.every(l =>
     net.nodes.some(n => n.id === l.source) && net.nodes.some(n => n.id === l.target)));
-  check('partner institutions', (await req('/partners')).data?.length === 10);
+  check('partner institutions', metrics?.partners?.length === 10);
 }
 
 head('Publications');
@@ -160,7 +166,10 @@ head('Datasets');
   check('CSV download', dl.status === 200 && /text\/csv/.test(dl.headers.get('content-type')) && csv.split('\n').length > 3);
   check('download sets an attachment filename', /attachment; filename=/.test(dl.headers.get('content-disposition') || ''));
   const after = (await req(`/datasets/${ds[0].slug}`)).data.downloads;
-  check('download counter increments', after === before + 1);
+  await (await req(`/datasets/${ds[0].slug}/download`, { raw: true })).text();
+  const again = (await req(`/datasets/${ds[0].slug}`)).data.downloads;
+  // Once per visitor per day: the first run today counts, a repeat does not.
+  check('download counter counts a visitor once a day', after - before <= 1 && again === after);
 }
 
 /* ---------------------------------------------------------- EVENTS ----- */
@@ -215,13 +224,6 @@ head('Careers and contact');
   check('contact message accepted', msg.status === 201 && /^MSG-\d{5}$/.test(msg.data?.reference));
   check('invalid contact message refused', (await req('/messages', { method: 'POST', body: { name: 'X' } })).status === 400);
 
-  // A separate client, so the limit it exhausts is not the one the rest of the run uses.
-  const flooder = fakeClient();
-  let limited = false;
-  for (let i = 0; i < 12 && !limited; i++) {
-    limited = (await req('/messages', { client: flooder, method: 'POST', body: { name: 'X' } })).status === 429;
-  }
-  check('public forms are rate-limited per client', limited);
 }
 
 /* ------------------------------------------------------------ AUTH ----- */
@@ -235,15 +237,6 @@ let admin, researcher, other;
   check('/auth/me returns the account', (await req('/auth/me', { token: admin })).data?.user?.role === 'admin');
   check('wrong password refused', (await req('/auth/login', { method: 'POST', body: { email: 'smoke-probe@example.mk', password: 'x' } })).status === 401);
   check('forged token refused', (await req('/auth/me', { token: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOjF9.x' })).status === 401);
-  const guesser = fakeClient();
-  let throttled = false;
-  for (let i = 0; i < 12 && !throttled; i++) {
-    throttled = (await req('/auth/login', { client: guesser, method: 'POST', body: { email: 'throttle-smoke@example.mk', password: 'x' } })).status === 429;
-  }
-  check('repeated failures are throttled', throttled);
-  check('throttled client is refused even with the right password',
-    (await req('/auth/login', { client: guesser, method: 'POST', body: { email: 'admin@genomika.mk', password: PASSWORD } })).status === 429);
-  check('other clients are unaffected', Boolean(await login('admin@genomika.mk')));
   check('a token cannot grant itself a role', (await req('/admin/overview', {
     token: 'eyJhbGciOiJub25lIn0.eyJzdWIiOjEsInJvbGUiOiJhZG1pbiJ9.' })).status === 401);
 }
@@ -265,6 +258,7 @@ head('Instrument booking');
   check('past date refused', (await req('/bookings', { token: researcher, method: 'POST', body: { instrument_slug: 'qpcr-station', date: day(-2), start_hour: 9, end_hour: 10 } })).data?.error === 'date_in_past');
   check('impossible calendar date refused', (await req('/bookings', { token: researcher, method: 'POST', body: { instrument_slug: 'qpcr-station', date: '2027-02-30', start_hour: 9, end_hour: 10 } })).status === 400);
   check('booking beyond the horizon refused', (await req('/bookings', { token: researcher, method: 'POST', body: { instrument_slug: 'qpcr-station', date: day(400), start_hour: 9, end_hour: 10 } })).data?.error === 'too_far_ahead');
+  check('an untrained researcher cannot book an instrument that requires training', (await req('/bookings', { token: researcher, method: 'POST', body: { instrument_slug: 'illumina-nextseq', date: day(21), start_hour: 9, end_hour: 10 } })).data?.error === 'training_required');
   check('instrument under maintenance refused', (await req('/bookings', { token: researcher, method: 'POST', body: { instrument_slug: 'bioanalyzer', date: day(21), start_hour: 9, end_hour: 10 } })).data?.error === 'instrument_unavailable');
 
   const anon = (await req(`/instruments/qpcr-station/availability?date=${date}`)).data;
@@ -320,6 +314,30 @@ head('Administration');
   const msg = ov.data.messages.find(m => m.subject === `Smoke test ${RUN}`);
   check('message marked handled', (await req(`/admin/messages/${msg.id}/handled`, { token: admin, method: 'PUT', body: { handled: true } })).status === 200);
   check('missing record is a 404, not a fake success', (await req('/admin/messages/999999/handled', { token: admin, method: 'PUT', body: { handled: true } })).status === 404);
+}
+
+/* ------------------------------------------------------ ABUSE LIMITS --- */
+// Last, because each check uses up this client's allowance for a while.
+head('Abuse limits');
+{
+  limitsExpected = true;
+  check('a forged X-Forwarded-For does not make a new client', await (async () => {
+    // nginx believes X-Forwarded-For only from proxies on its own network, so
+    // these requests all count against the same client however they are labelled.
+    let limited = false;
+    for (let i = 0; i < 12 && !limited; i++) {
+      limited = (await req('/messages', { method: 'POST', headers: { 'X-Forwarded-For': `203.0.113.${i + 1}` },
+        body: { name: 'X' } })).status === 429;
+    }
+    return limited;
+  })());
+  let throttled = false;
+  for (let i = 0; i < 12 && !throttled; i++) {
+    throttled = (await req('/auth/login', { method: 'POST', body: { email: 'throttle-smoke@example.mk', password: 'x' } })).status === 429;
+  }
+  check('repeated sign-in failures are throttled', throttled);
+  check('a throttled client is refused even with the right password',
+    (await req('/auth/login', { method: 'POST', body: { email: 'admin@genomika.mk', password: ADMIN_PASSWORD } })).status === 429);
 }
 
 /* --------------------------------------------------------- SUMMARY ----- */

@@ -41,10 +41,11 @@ after(() => {
 /* ------------------------------------------------------------- helpers -- */
 
 /*
- * Per-client limits key on the caller's address, and every request here comes
- * from loopback. Each call therefore presents its own address from the range
- * reserved for benchmarking (RFC 2544), so a limit trips only in the tests
- * that pin an address on purpose.
+ * Per-client limits key on the caller's address. In production the api sits
+ * behind exactly one proxy, nginx, which hands it a single X-Forwarded-For
+ * value; here the test client plays that proxy, giving each call its own
+ * address from the range reserved for benchmarking (RFC 2544) so that a limit
+ * trips only in the tests that pin an address on purpose.
  */
 let nextClient = 0;
 const freshClient = () => `198.18.${(++nextClient >> 8) & 255}.${nextClient & 255}`;
@@ -73,10 +74,13 @@ const signIn = async (email, password = 'genomika2026') => {
 const { db } = await import('../src/db.js');
 const jwt = (await import('jsonwebtoken')).default;
 
+// Local calendar dates, as the server uses; toISOString() would give the UTC
+// date, which in Skopje is the previous day until 01:00 or 02:00.
+const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const dayFromNow = (n) => {
   const d = new Date();
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return isoDay(d);
 };
 
 /* ---------------------------------------------------------------- AUTH -- */
@@ -101,6 +105,16 @@ test('login rejects a wrong password and an unknown address identically', async 
   assert.equal(wrong.status, 401);
   assert.equal(absent.status, 401);
   assert.deepEqual(wrong.body, absent.body);   // no account enumeration
+});
+
+test('the login page lists only the demo accounts the deployment advertises, with working passwords', async () => {
+  // Outside production with nothing configured, both roles are listed with the development password.
+  const { accounts } = (await json('/auth/demo')).body;
+  assert.deepEqual(accounts.map(a => a.role).sort(), ['admin', 'researcher']);
+  for (const account of accounts) {
+    const { status } = await json('/auth/login', { method: 'POST', body: { email: account.email, password: account.password } });
+    assert.equal(status, 200, `${account.role} login works as listed`);
+  }
 });
 
 test('a forged or absent token is treated as anonymous, not trusted', async () => {
@@ -210,6 +224,33 @@ test('an instrument under maintenance cannot be booked', async () => {
   });
   assert.equal(status, 409);
   assert.equal(body.error, 'instrument_unavailable');
+});
+
+test('an instrument that requires training can be booked only by someone trained on it', async () => {
+  const nikola = await signIn('n.avramovski@genomika.mk');   // trained on the nanopore sequencer only
+  const date = dayFromNow(40);
+  const untrained = await json('/bookings', { token: nikola, method: 'POST',
+    body: { instrument_slug: 'illumina-nextseq', date, start_hour: 9, end_hour: 10 } });
+  assert.equal(untrained.status, 403);
+  assert.equal(untrained.body.error, 'training_required');
+
+  const trained = await json('/bookings', { token: nikola, method: 'POST',
+    body: { instrument_slug: 'nanopore-promethion', date, start_hour: 9, end_hour: 10 } });
+  assert.equal(trained.status, 201);
+
+  const list = (await json('/instruments', { token: nikola })).body;
+  assert.equal(list.find(i => i.slug === 'illumina-nextseq').trained, false);
+  assert.equal(list.find(i => i.slug === 'nanopore-promethion').trained, true);
+  assert.equal(list.find(i => i.slug === 'hpc-cluster').trained, true, 'no training needed counts as trained');
+  const availability = (await json(`/instruments/illumina-nextseq/availability?date=${date}`, { token: nikola })).body;
+  assert.equal(availability.instrument.trained, false, 'the booking view knows too');
+});
+
+test('a booking purpose is a short string or nothing', async () => {
+  const token = await signIn('n.avramovski@genomika.mk');
+  const base = { instrument_slug: 'hpc-cluster', date: dayFromNow(41), start_hour: 9, end_hour: 10 };
+  assert.equal((await json('/bookings', { token, method: 'POST', body: { ...base, purpose: { a: 1 } } })).body.error, 'invalid_purpose');
+  assert.equal((await json('/bookings', { token, method: 'POST', body: { ...base, purpose: 'x'.repeat(500) } })).body.error, 'purpose_too_long');
 });
 
 test('a booking can be cancelled by its owner and by nobody else', async () => {
@@ -420,7 +461,33 @@ test('an accepted upload is written exactly once', async () => {
   assert.equal(status, 201);
   const files = readdirSync(process.env.UPLOAD_DIR);
   assert.equal(files.length, 1);
-  assert.match(files[0], /-cv\.pdf$/);
+  // Stored under a random key with the vetted extension, never the applicant's own name.
+  assert.match(files[0], /^[0-9a-f-]{36}\.pdf$/);
+});
+
+const apply = (cv, email) => json('/positions/intern-summer/apply', {
+  method: 'POST',
+  body: { name: 'Upload Tester', email, cv,
+          motivation: 'A motivation letter comfortably past the minimum length requirement.' }
+});
+const asData = (buffer, type) => `data:${type};base64,${buffer.toString('base64')}`;
+const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+test('a file must agree with itself: extension, declared type and contents', async () => {
+  const pdfBytes = Buffer.from('%PDF-1.4 <script>alert(1)</script>');
+  const html = await apply({ name: 'page.html', type: 'application/pdf', data: asData(pdfBytes, 'application/pdf') }, 'u1@example.mk');
+  assert.equal(html.body.fields?.cv, 'unsupported_type', 'a PDF-looking file with an .html name is refused');
+
+  const mislabelled = await apply({ name: 'cv.pdf', type: DOCX, data: asData(pdfBytes, DOCX) }, 'u2@example.mk');
+  assert.equal(mislabelled.body.fields?.cv, 'unsupported_type', 'a declared type that contradicts the extension is refused');
+
+  const anyZip = Buffer.concat([Buffer.from([0x50, 0x4B, 0x03, 0x04]), Buffer.from('payload.exe')]);
+  const zip = await apply({ name: 'payload.exe.docx', type: DOCX, data: asData(anyZip, DOCX) }, 'u3@example.mk');
+  assert.equal(zip.body.fields?.cv, 'unsupported_type', 'a zip without a Word document inside is not a .docx');
+
+  const docx = Buffer.concat([Buffer.from([0x50, 0x4B, 0x03, 0x04]), Buffer.from('....word/document.xml....')]);
+  const ok = await apply({ name: 'Моја биографија.docx', type: DOCX, data: asData(docx, DOCX) }, 'u4@example.mk');
+  assert.equal(ok.status, 201, 'a zip carrying word/document.xml is accepted, whatever the name\'s script');
 });
 
 test('failed sign-ins throttle the client that made them, and nobody else', async () => {
@@ -436,6 +503,18 @@ test('failed sign-ins throttle the client that made them, and nobody else', asyn
   // keying on the account would have locked them out.
   const owner = await json('/auth/login', { ip: '203.0.113.50', method: 'POST', body: { email: 'admin@genomika.mk', password: 'genomika2026' } });
   assert.equal(owner.status, 200);
+});
+
+test('only the address the proxy appended counts; what a client writes before it is ignored', async () => {
+  // A client can send its own X-Forwarded-For; nginx forwards a single value,
+  // but if anything ever appended instead, the left entries must not matter.
+  let throttledAt = null;
+  for (let i = 1; i <= 12 && !throttledAt; i++) {
+    const { status } = await json('/auth/login', { ip: `10.9.9.${i}, 203.0.113.99`, method: 'POST',
+      body: { email: 'admin@genomika.mk', password: 'wrong' } });
+    if (status === 429) throttledAt = i;
+  }
+  assert.ok(throttledAt && throttledAt <= 9, `rotating the forged entry does not escape the throttle (at ${throttledAt})`);
 });
 
 test('a successful sign-in resets that client\'s failure count', async () => {
@@ -587,6 +666,36 @@ test('an administrator can create, amend and delete a publication', async () => 
   assert.equal((await json(`/admin/publications/${id}`, { token, method: 'DELETE' })).status, 404);
 });
 
+test('a publication added by an administrator is linked to the lab members in its author line', async () => {
+  const token = await signIn('admin@genomika.mk');
+  const created = await json('/admin/publications', { token, method: 'POST',
+    body: { title: 'Linked authorship check', authors: 'Outsider Q, Trajkovska A, Risteska E', venue: 'Test Venue', year: 2026 } });
+  assert.equal(created.status, 201);
+  const ana = (await json('/people/ana-trajkovska')).body;
+  assert.ok(ana.publications.some(p => p.title === 'Linked authorship check'), 'it appears on the author\'s profile');
+
+  await json(`/admin/publications/${created.body.id}`, { token, method: 'PUT', body: { authors: 'Outsider Q, Risteska E' } });
+  const anaAfter = (await json('/people/ana-trajkovska')).body;
+  assert.ok(!anaAfter.publications.some(p => p.title === 'Linked authorship check'), 'and leaves it when removed from the line');
+  const elena = (await json('/people/elena-risteska')).body;
+  assert.ok(elena.publications.some(p => p.title === 'Linked authorship check'));
+});
+
+test('a person created without a seniority gets one the team page lists', async () => {
+  const token = await signIn('admin@genomika.mk');
+  const created = await json('/admin/people', { token, method: 'POST', body: { name_mk: 'Нов Член', name_en: 'New Member' } });
+  assert.equal(created.status, 201);
+  assert.ok(['faculty', 'postdoc', 'staff', 'phd', 'msc'].includes(created.body.seniority));
+  assert.equal((await json(`/admin/people/${created.body.id}`, { token, method: 'PUT', body: { seniority: created.body.seniority } })).status, 200);
+  await json(`/admin/people/${created.body.id}`, { token, method: 'DELETE' });
+});
+
+test('search wildcards are matched literally', async () => {
+  assert.equal((await json('/people?q=_')).body.length, 0);
+  assert.equal((await json('/publications?q=%25')).body.total, 0);
+  assert.ok((await json('/people?q=metagenomics')).body.length > 0, 'English interests are searchable');
+});
+
 test('admin creation refuses incomplete records', async () => {
   const token = await signIn('admin@genomika.mk');
   assert.equal((await json('/admin/publications', { token, method: 'POST', body: { authors: 'X' } })).status, 400);
@@ -721,7 +830,7 @@ test('renaming a news item onto a taken slug is a conflict, not a crash', async 
 
 test('project status follows from its dates rather than a stored value', async () => {
   const projects = (await json('/projects')).body;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = isoDay(new Date());
   for (const p of projects) {
     const expected = today < p.start_date ? 'planned' : today > p.end_date ? 'completed' : 'active';
     assert.equal(p.status, expected, `${p.slug}: ${p.start_date} → ${p.end_date}`);

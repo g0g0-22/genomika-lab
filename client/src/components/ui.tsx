@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode } from 'react';
+import { type CSSProperties, type ElementType, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLang } from '../i18n';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
@@ -105,7 +105,7 @@ export function SectionHeading({ index, title, sub, right }: {
 /* ------------------------------------------------------------- SURFACES */
 
 export function Card({ children, className = '', hover = false, as: As = 'div', style }: {
-  children: ReactNode; className?: string; hover?: boolean; as?: any; style?: CSSProperties;
+  children: ReactNode; className?: string; hover?: boolean; as?: ElementType; style?: CSSProperties;
 }) {
   return <As className={`card ${hover ? 'card-hover' : ''} ${className}`} style={style}>{children}</As>;
 }

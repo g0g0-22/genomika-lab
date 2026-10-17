@@ -37,17 +37,26 @@ export function parseFasta(text: string): ParsedFasta[] {
     .filter(r => r.seq.length > 0);
 }
 
-/** Uppercases and keeps only letters of the requested alphabet. */
+/**
+ * Uppercases, then keeps every position the sequence really has. An IUPAC
+ * ambiguity code outside the requested alphabet (R, Y, K …) is a base of
+ * uncertain identity, so it becomes N rather than vanishing: deleting one
+ * shifted every downstream codon and produced a different protein. Only
+ * characters that are no nucleotide code at all are dropped. Both are counted
+ * so the interface can say what it did.
+ */
 export function cleanSequence(raw: string, alphabet = DNA_ALPHABET) {
   const upper = raw.toUpperCase().replace(/[^A-Z*]/g, '');
   const allowed = new Set(alphabet.split(''));
-  let kept = '';
+  let seq = '';
+  let ambiguous = 0;
   let dropped = 0;
   for (const ch of upper) {
-    if (allowed.has(ch)) kept += ch;
+    if (allowed.has(ch)) seq += ch;
+    else if (IUPAC_DNA_ALPHABET.includes(ch)) { seq += 'N'; ambiguous++; }
     else dropped++;
   }
-  return { seq: kept, dropped };
+  return { seq, ambiguous, dropped };
 }
 
 /**
@@ -118,8 +127,11 @@ export function gcContent(seq: string) {
  * masses — as an earlier version of this function did — overstates the
  * result by 18.02 Da for every bond in the chain.
  *
- * The trailing −61.96 converts from a 5'-monophosphate to the 5'-hydroxyl an
- * ordinary synthesised oligo carries. Values match OligoCalc.
+ * The trailing −61.96 converts from a 5'-monophosphate to the 5'-hydroxyl a
+ * synthesised oligo carries. For DNA the result equals OligoCalc's. RNA is
+ * given with the same 5'-hydroxyl end, as for a synthetic RNA oligo;
+ * OligoCalc instead assumes an in-vitro transcript with a 5'-triphosphate
+ * (+159.0), so its RNA figures run 220.96 Da higher by design.
  */
 const DNA_RESIDUE_MASS: Record<string, number> = { A: 313.21, T: 304.20, G: 329.21, C: 289.18, N: 308.95 };
 const RNA_RESIDUE_MASS: Record<string, number> = { A: 329.21, U: 306.17, G: 345.21, C: 305.18, N: 321.44 };

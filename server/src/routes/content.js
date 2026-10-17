@@ -3,6 +3,28 @@ import { db } from '../db.js';
 
 export const content = Router();
 
+/*
+ * A search term is text, so % and _ in it must match themselves. Unescaped,
+ * ?q=_ matched every row. Used with ESCAPE '\\' in each LIKE below.
+ */
+const contains = (q) => `%${String(q).replace(/[\\%_]/g, ch => `\\${ch}`)}%`;
+const LIKE = "LIKE ? ESCAPE '\\'";
+
+/*
+ * The download counter is a popularity figure on the metrics page, so one
+ * visitor fetching the same file again within a day counts once. Kept in
+ * memory: it resets with the process, which errs towards counting.
+ */
+const counted = new Map();
+function firstDownloadToday(ip, datasetId) {
+  const key = `${ip}|${datasetId}`;
+  const day = new Date().toDateString();
+  if (counted.get(key) === day) return false;
+  if (counted.size > 20_000) counted.clear();
+  counted.set(key, day);
+  return true;
+}
+
 /* ---------------------------------------------------------------- GROUPS */
 content.get('/groups', (_req, res) => {
   const groups = db.prepare('SELECT * FROM groups ORDER BY founded').all();
@@ -32,7 +54,10 @@ content.get('/people', (req, res) => {
   const params = [];
   if (group) { sql += ' AND g.slug = ?'; params.push(group); }
   if (seniority) { sql += ' AND p.seniority = ?'; params.push(seniority); }
-  if (q) { sql += ' AND (p.name_mk LIKE ? OR p.name_en LIKE ? OR p.interests LIKE ?)'; params.push(`%${q}%`, `%${q}%`, `%${q}%`); }
+  if (q) {
+    sql += ` AND (p.name_mk ${LIKE} OR p.name_en ${LIKE} OR p.interests_mk ${LIKE} OR p.interests_en ${LIKE})`;
+    params.push(contains(q), contains(q), contains(q), contains(q));
+  }
   const order = `CASE p.seniority WHEN 'faculty' THEN 0 WHEN 'postdoc' THEN 1 WHEN 'staff' THEN 2 WHEN 'phd' THEN 3 ELSE 4 END`;
   res.json(db.prepare(`${sql} ORDER BY ${order}, p.joined_year`).all(...params));
 });
@@ -73,8 +98,8 @@ content.get('/publications', (req, res) => {
   const params = [];
   let where = ' WHERE 1=1';
   if (q) {
-    where += ' AND (pub.title LIKE ? OR pub.authors LIKE ? OR pub.venue LIKE ? OR pub.keywords LIKE ?)';
-    params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+    where += ` AND (pub.title ${LIKE} OR pub.authors ${LIKE} OR pub.venue ${LIKE} OR pub.keywords ${LIKE})`;
+    params.push(contains(q), contains(q), contains(q), contains(q));
   }
   if (year) { where += ' AND pub.year = ?'; params.push(Number(year)); }
   if (type) { where += ' AND pub.type = ?'; params.push(type); }
@@ -109,7 +134,10 @@ content.get('/datasets', (req, res) => {
   const { q = '', format, license } = req.query;
   let sql = 'SELECT * FROM datasets WHERE 1=1';
   const params = [];
-  if (q) { sql += ' AND (title_mk LIKE ? OR title_en LIKE ? OR organism LIKE ?)'; params.push(`%${q}%`, `%${q}%`, `%${q}%`); }
+  if (q) {
+    sql += ` AND (title_mk ${LIKE} OR title_en ${LIKE} OR organism ${LIKE})`;
+    params.push(contains(q), contains(q), contains(q));
+  }
   if (format) { sql += ' AND format = ?'; params.push(format); }
   if (license) { sql += ' AND license = ?'; params.push(license); }
   res.json(db.prepare(`${sql} ORDER BY year DESC, downloads DESC`).all(...params));
@@ -124,7 +152,7 @@ content.get('/datasets/:slug', (req, res) => {
 content.get('/datasets/:slug/download', (req, res) => {
   const row = db.prepare('SELECT * FROM datasets WHERE slug = ?').get(req.params.slug);
   if (!row) return res.status(404).json({ error: 'not_found' });
-  db.prepare('UPDATE datasets SET downloads = downloads + 1 WHERE id = ?').run(row.id);
+  if (firstDownloadToday(req.ip, row.id)) db.prepare('UPDATE datasets SET downloads = downloads + 1 WHERE id = ?').run(row.id);
   const mk = req.query.lang === 'mk';
   const header = mk
     ? `# ${row.title_mk}\n# ${row.doi}  |  ${row.license}\n# Демонстрациски извадок — ГеномикаЛаб\n`
@@ -195,9 +223,4 @@ content.get('/network', (_req, res) => {
   coauthor.forEach(c => links.push({ source: `p${c.a}`, target: `p${c.b}`, kind: 'coauthor', weight: c.n }));
 
   res.json({ nodes, links });
-});
-
-/* -------------------------------------------------------------- PARTNERS */
-content.get('/partners', (_req, res) => {
-  res.json(db.prepare('SELECT * FROM partners ORDER BY joint_papers DESC').all());
 });

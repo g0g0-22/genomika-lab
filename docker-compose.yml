@@ -18,6 +18,10 @@ services:
         condition: service_healthy
     expose:
       - "80"
+    environment:
+      # Optional extra proxy ranges whose X-Forwarded-For nginx may believe.
+      # Proxies on the container's own networks are trusted automatically.
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
 
   api:
     build:
@@ -35,6 +39,13 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in a .env file or the environment}
       # Set to "false" to deploy with an empty database instead of demo content.
       AUTO_SEED: ${AUTO_SEED:-true}
+      # Passwords for the seeded administrator and researcher accounts. Unset,
+      # each is generated on first boot and printed once in this service's log.
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      # Which accounts the login page lists, with their password:
+      # none (default), researcher, or all. Admin is listed only with "all".
+      DEMO_LOGINS: ${DEMO_LOGINS:-none}
     volumes:
       - genomika-data:/data
     expose:

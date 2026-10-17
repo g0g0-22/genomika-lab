@@ -12,6 +12,43 @@ export type GraphLink = { source: string; target: string; kind: string; weight: 
 type Sim = GraphNode & { x: number; y: number; vx: number; vy: number; fixed: boolean };
 
 /**
+ * The graph's relations as text. The drawing is read with a pointer; this is
+ * the same information for keyboard and screen-reader users, person by person:
+ * their group, their projects and whom they have published with.
+ */
+function NetworkAsList({ nodes, links }: { nodes: GraphNode[]; links: GraphLink[] }) {
+  const { t, f } = useLang();
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  const neighbours = (id: string, kind: string) => links
+    .filter(l => l.kind === kind && (l.source === id || l.target === id))
+    .map(l => ({ node: byId.get(l.source === id ? l.target : l.source), weight: l.weight }))
+    .filter((x): x is { node: GraphNode; weight: number } => Boolean(x.node));
+
+  return (
+    <details className="mt-6">
+      <summary className="label cursor-pointer">{t('met.networklist')}</summary>
+      <ul className="mt-4 grid gap-4 sm:grid-cols-2 text-[13px]">
+        {nodes.filter(n => n.kind === 'person').map(person => {
+          const group = neighbours(person.id, 'affiliation')[0]?.node;
+          const projects = neighbours(person.id, 'works_on').map(x => f(x.node, 'label'));
+          const coauthors = neighbours(person.id, 'coauthor')
+            .sort((a, b) => b.weight - a.weight)
+            .map(x => `${f(x.node, 'label')} (${x.weight})`);
+          return (
+            <li key={person.id}>
+              <span className="text-ink">{f(person, 'label')}</span>
+              {group && <span className="text-muted"> — {f(group, 'label')}</span>}
+              {projects.length > 0 && <p className="text-ink2 mt-0.5">{t('met.projects')}: {projects.join(', ')}</p>}
+              {coauthors.length > 0 && <p className="text-ink2 mt-0.5">{t('met.coauthors')}: {coauthors.join(', ')}</p>}
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+}
+
+/**
  * A small force-directed layout.
  *
  * Three forces run each tick: nodes repel one another, linked nodes are pulled
@@ -174,9 +211,11 @@ export function NetworkGraph({ nodes, links, height = 520 }: {
           </span>
         ))}
         {selected && (
-          <button className="btn btn-sm ml-auto" onClick={() => setSelected(null)}>{t('common.clear')}</button>
+          <button type="button" className="btn btn-sm ml-auto" onClick={() => setSelected(null)}>{t('common.clear')}</button>
         )}
       </div>
+
+      <NetworkAsList nodes={nodes} links={links} />
     </div>
   );
 }
@@ -257,7 +296,7 @@ export function PartnerMap({ partners, height = 420 }: { partners: Partner[]; he
         {Array.from({ length: 7 }, (_, i) => bounds.minLat + (i * (bounds.maxLat - bounds.minLat)) / 6).map(lat => (
           <g key={`lat${lat}`}>
             <line x1={20} x2={width - 20} y1={y(lat)} y2={y(lat)} stroke="var(--line)" strokeWidth="1" strokeDasharray="2 6" />
-            <text x={6} y={y(lat) + 3} fontSize="8" fill="var(--muted)" className="num">{lat.toFixed(0)}°</text>
+            <text x={6} y={y(lat) + 3} fontSize="10" fill="var(--muted)" className="num">{lat.toFixed(0)}°</text>
           </g>
         ))}
         {Array.from({ length: 7 }, (_, i) => bounds.minLng + (i * (bounds.maxLng - bounds.minLng)) / 6).map(lng => (

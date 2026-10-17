@@ -4,7 +4,7 @@ import { post, ApiError, fieldError } from '../lib/api';
 import { PageHeader, Card, Label, Field, Notice, DnaStrip } from '../components/ui';
 
 export default function Contact() {
-  const { t, lang } = useLang();
+  const { t, tv } = useLang();
   const [form, setForm] = useState({ name: '', email: '', subject: '', body: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [state, setState] = useState<'idle' | 'sending' | 'done'>('idle');
@@ -49,14 +49,14 @@ export default function Contact() {
             </div>
           ) : (
             <form onSubmit={submit} className="grid gap-5 md:grid-cols-2">
-              <Field label={t('common.name')} required error={fieldError(t, errors.name)}>
+              <Field label={t('common.name')} required error={fieldError(tv, errors.name)}>
                 <input className="input" value={form.name} onChange={set('name')} required minLength={2} />
               </Field>
-              <Field label={t('common.email')} required error={fieldError(t, errors.email)}>
+              <Field label={t('common.email')} required error={fieldError(tv, errors.email)}>
                 <input className="input" type="email" value={form.email} onChange={set('email')} required />
               </Field>
               <div className="md:col-span-2">
-                <Field label={t('con.subject')} required error={fieldError(t, errors.subject)}>
+                <Field label={t('con.subject')} required error={fieldError(tv, errors.subject)}>
                   <input className="input" value={form.subject} onChange={set('subject')} required minLength={3} />
                 </Field>
               </div>
@@ -65,7 +65,7 @@ export default function Contact() {
                   label={t('con.message')}
                   required
                   hint={`${form.body.length} ${t('common.chars')} · min 20`}
-                  error={fieldError(t, errors.body)}
+                  error={fieldError(tv, errors.body)}
                 >
                   <textarea className="input" rows={7} value={form.body} onChange={set('body')} required minLength={20} maxLength={4000} />
                 </Field>

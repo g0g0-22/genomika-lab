@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLang } from '../../i18n';
 import { useAuth } from '../../lib/auth';
-import { useFetch } from '../../lib/useFetch';
+import { useFetch, useAllPages } from '../../lib/useFetch';
 import { localIsoDate } from '../../lib/dates';
 import { post, put, del, ApiError, downloadProtected, fieldError } from '../../lib/api';
-import { PageHeader, Card, Label, Loading, ErrorBox, Empty, Toggle, Field, Notice, Stat } from '../../components/ui';
+import { PageHeader, Card, Loading, ErrorBox, Empty, Toggle, Field, Notice, Stat } from '../../components/ui';
 
 type Overview = {
   counts: Record<string, number>;
+  inboxTotals: { applications: number; messages: number };
   recentApplications: { id: number; name: string; email: string; motivation: string; cv_filename: string | null; cv_size: number | null; status: string; created_at: string; position_en: string; position_mk: string }[];
   messages: { id: number; name: string; email: string; subject: string; body: string; handled: number; created_at: string }[];
   upcomingBookings: { id: number; user_name: string; user_name_mk: string; user_name_en: string; date: string; start_hour: number; end_hour: number; purpose: string; instrument_en: string; instrument_mk: string }[];
@@ -16,8 +17,9 @@ type Overview = {
 };
 
 type Pub = { id: number; title: string; authors: string; venue: string; year: number; type: string; doi: string; citations: number; open_access: number; keywords: string; group_id: number | null };
+type GroupRow = { id: number; slug: string; name_mk: string; name_en: string };
 type NewsRow = { id: number; slug: string; date: string; tag: string; title_mk: string; title_en: string; excerpt_mk: string; excerpt_en: string; body_mk: string; body_en: string };
-type PersonRow = { id: number; slug: string; name_mk: string; name_en: string; role_mk: string; role_en: string; seniority: string; email: string; joined_year: number };
+type PersonRow = { id: number; slug: string; name_mk: string; name_en: string; role_mk: string; role_en: string; seniority: string; email: string; joined_year: number; interests_mk: string | null; interests_en: string | null };
 
 const TABS = ['overview', 'publications', 'news', 'people', 'inbox'] as const;
 
@@ -29,8 +31,15 @@ const TABS = ['overview', 'publications', 'news', 'people', 'inbox'] as const;
  */
 const formatBytes = (bytes: number) => (bytes < 1024 ? `${bytes} B` : `${Math.round(bytes / 1024)} KB`);
 
-function useMutation(onSettled?: () => void) {
+/** "· latest 20 of 37", shown only when a list is not the whole set. */
+function Shown({ n, total }: { n: number; total: number }) {
   const { t } = useLang();
+  if (total <= n) return null;
+  return <span className="text-muted normal-case tracking-normal"> · {t('adm.latest').replace('{n}', String(n)).replace('{total}', String(total))}</span>;
+}
+
+function useMutation(onSettled?: () => void) {
+  const { t, tv } = useLang();
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -51,7 +60,7 @@ function useMutation(onSettled?: () => void) {
       // Say what was wrong, field by field, rather than echo an error code.
       const text = !(err instanceof ApiError) ? t('common.error')
         : err.code === 'slug_taken' ? t('adm.err.slug_taken')
-        : err.fields ? Object.entries(err.fields).map(([field, code]) => `${field}: ${fieldError(t, String(code))}`).join(' ')
+        : err.fields ? Object.entries(err.fields).map(([field, code]) => `${field}: ${fieldError(tv, String(code))}`).join(' ')
         : `${t('common.error')} (${err.code})`;
       setNotice({ kind: 'error', text });
       return false;
@@ -64,15 +73,16 @@ function useMutation(onSettled?: () => void) {
 }
 
 export default function Admin() {
-  const { t, f, formatDate, formatNumber } = useLang();
+  const { t, f, formatDate, formatNumber, tv } = useLang();
   const { user, ready } = useAuth();
   const [tab, setTab] = useState<string>('overview');
   const [flash, setFlash] = useState<string | null>(null);
 
   const overview = useFetch<Overview>(user?.role === 'admin' ? '/admin/overview' : null, [user?.id]);
-  const publications = useFetch<{ items: Pub[] }>(user?.role === 'admin' ? '/publications?limit=50' : null, [user?.id, flash]);
+  const publications = useAllPages<Pub>(user?.role === 'admin' ? '/publications' : null, [user?.id, flash]);
   const news = useFetch<NewsRow[]>(user?.role === 'admin' ? '/news' : null, [user?.id, flash]);
   const people = useFetch<PersonRow[]>(user?.role === 'admin' ? '/people' : null, [user?.id, flash]);
+  const groups = useFetch<GroupRow[]>(user?.role === 'admin' ? '/groups' : null, [user?.id]);
 
   // Every hook must run on every render, in the same order. They sit above the
   // early returns below: placing them after one made the first render (before
@@ -115,7 +125,7 @@ export default function Admin() {
             ariaLabel={t('common.filter')}
             value={tab}
             onChange={setTab}
-            options={TABS.map(key => ({ value: key, label: t(`adm.tab.${key}` as any) }))}
+            options={TABS.map(key => ({ value: key, label: tv('adm.tab', key) }))}
           />
           <span className="label">{t('auth.signedas')} <span className="text-accent">{user.email}</span></span>
         </div>
@@ -132,7 +142,7 @@ export default function Admin() {
               <section className="grid grid-cols-2 md:grid-cols-4 gap-8 pb-12 border-b border-line">
                 {Object.entries(overview.data.counts).map(([key, value], i) => (
                   <div key={key} className="rise" style={{ animationDelay: `${i * 45}ms` }}>
-                    <Stat value={formatNumber(value)} label={t(`adm.count.${key}` as any)} />
+                    <Stat value={formatNumber(value)} label={tv('adm.count', key)} />
                   </div>
                 ))}
               </section>
@@ -174,7 +184,7 @@ export default function Admin() {
       )}
 
       {tab === 'publications' && (
-        <PublicationEditor rows={publications.data?.items ?? []} onDone={() => done('pub')} />
+        <PublicationEditor rows={publications.data ?? []} groups={groups.data ?? []} onDone={() => done('pub')} />
       )}
 
       {tab === 'news' && <NewsEditor rows={news.data ?? []} onDone={() => done('news')} />}
@@ -187,7 +197,10 @@ export default function Admin() {
             <div className="lg:col-span-2"><Notice kind={inbox.notice.kind}>{inbox.notice.text}</Notice></div>
           )}
           <Card className="p-6">
-            <h2 className="label mb-4">{t('adm.applications')}</h2>
+            <h2 className="label mb-4">
+              {t('adm.applications')}
+              <Shown n={overview.data.recentApplications.length} total={overview.data.inboxTotals.applications} />
+            </h2>
             {overview.data.recentApplications.length === 0 && (
               <p className="text-[13px] text-muted py-4">{t('adm.noapplications')}</p>
             )}
@@ -195,7 +208,7 @@ export default function Admin() {
               {overview.data.recentApplications.map(application => (
                 <li key={application.id} className="card p-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="chip chip-on">{t(`adm.status.${application.status}` as any)}</span>
+                    <span className="chip chip-on">{tv('adm.status', application.status)}</span>
                     <span className="label ml-auto">{formatDate(application.created_at, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                   </div>
                   <h3 className="mt-2.5 text-[15px]">{application.name}</h3>
@@ -227,7 +240,7 @@ export default function Admin() {
                         )}
                         disabled={inbox.busy}
                       >
-                        {t(`adm.status.${status}` as any)}
+                        {tv('adm.status', status)}
                       </button>
                     ))}
                   </div>
@@ -237,7 +250,10 @@ export default function Admin() {
           </Card>
 
           <Card className="p-6">
-            <h2 className="label mb-4">{t('adm.messages')}</h2>
+            <h2 className="label mb-4">
+              {t('adm.messages')}
+              <Shown n={overview.data.messages.length} total={overview.data.inboxTotals.messages} />
+            </h2>
             {overview.data.messages.length === 0 && (
               <p className="text-[13px] text-muted py-4">{t('adm.nomessages')}</p>
             )}
@@ -277,11 +293,15 @@ export default function Admin() {
 
 /* ------------------------------------------------------------- EDITORS -- */
 
-const EMPTY_PUB = { title: '', authors: '', venue: '', year: new Date().getFullYear(), type: 'article', doi: '', citations: 0, open_access: 1, keywords: '' };
+type PubDraft = {
+  title: string; authors: string; venue: string; year: number; type: string;
+  doi: string | null; citations: number; open_access: number; keywords: string | null; group_id: number | null;
+};
+const EMPTY_PUB: PubDraft = { title: '', authors: '', venue: '', year: new Date().getFullYear(), type: 'article', doi: '', citations: 0, open_access: 1, keywords: '', group_id: null };
 
-function PublicationEditor({ rows, onDone }: { rows: Pub[]; onDone: () => void }) {
-  const { t } = useLang();
-  const [draft, setDraft] = useState<any>(EMPTY_PUB);
+function PublicationEditor({ rows, groups, onDone }: { rows: Pub[]; groups: GroupRow[]; onDone: () => void }) {
+  const { t, f, tv } = useLang();
+  const [draft, setDraft] = useState<PubDraft>(EMPTY_PUB);
   const [editing, setEditing] = useState<number | null>(null);
   const { run, busy, notice } = useMutation(onDone);
 
@@ -336,6 +356,23 @@ function PublicationEditor({ rows, onDone }: { rows: Pub[]; onDone: () => void }
           <Field label={t('adm.venue')} required>
             <input className="input" value={draft.venue} onChange={e => setDraft({ ...draft, venue: e.target.value })} />
           </Field>
+          {/* Type and group decide where the record is counted on the metrics page. */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={t('common.type')}>
+              <select className="input" value={draft.type} onChange={e => setDraft({ ...draft, type: e.target.value })}>
+                {['article', 'conference', 'preprint'].map(type => (
+                  <option key={type} value={type}>{tv('pub.type', type)}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label={t('common.group')}>
+              <select className="input" value={draft.group_id ?? ''}
+                      onChange={e => setDraft({ ...draft, group_id: e.target.value ? Number(e.target.value) : null })}>
+                <option value="">—</option>
+                {groups.map(g => <option key={g.id} value={g.id}>{f(g, 'name')}</option>)}
+              </select>
+            </Field>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('common.year')}>
               <input className="input num" type="number" value={draft.year} onChange={e => setDraft({ ...draft, year: Number(e.target.value) })} />
@@ -347,6 +384,14 @@ function PublicationEditor({ rows, onDone }: { rows: Pub[]; onDone: () => void }
           <Field label="DOI">
             <input className="input num" value={draft.doi ?? ''} onChange={e => setDraft({ ...draft, doi: e.target.value })} />
           </Field>
+          <Field label={t('adm.keywords')} hint={t('adm.keywordshint')}>
+            <input className="input" value={draft.keywords ?? ''} onChange={e => setDraft({ ...draft, keywords: e.target.value })} />
+          </Field>
+          <label className="flex items-center gap-2.5 text-[13px] text-ink2">
+            <input type="checkbox" checked={Number(draft.open_access) === 1}
+                   onChange={e => setDraft({ ...draft, open_access: e.target.checked ? 1 : 0 })} />
+            {t('pub.openaccess')}
+          </label>
           <div className="flex gap-2">
             <button type="submit" className="btn btn-primary flex-1 justify-center" disabled={busy || !draft.title || !draft.authors || !draft.venue}>
               {t('common.save')}
@@ -361,11 +406,12 @@ function PublicationEditor({ rows, onDone }: { rows: Pub[]; onDone: () => void }
   );
 }
 
+type NewsDraft = typeof EMPTY_NEWS;
 const EMPTY_NEWS = { title_mk: '', title_en: '', excerpt_mk: '', excerpt_en: '', body_mk: '', body_en: '', tag: 'news', date: localIsoDate() };
 
 function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
-  const { t, f, formatDate } = useLang();
-  const [draft, setDraft] = useState<any>(EMPTY_NEWS);
+  const { t, f, formatDate, tv } = useLang();
+  const [draft, setDraft] = useState<NewsDraft>(EMPTY_NEWS);
   const [editing, setEditing] = useState<number | null>(null);
   const { run, busy, notice } = useMutation(onDone);
 
@@ -395,7 +441,7 @@ function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
                 <span className="label w-24 shrink-0">{formatDate(row.date, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-[14px] leading-snug">{f(row, 'title')}</h3>
-                  <span className="chip mt-1.5">{t(`news.tag.${row.tag}` as any)}</span>
+                  <span className="chip mt-1.5">{tv('news.tag', row.tag)}</span>
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button type="button" className="btn btn-sm" onClick={() => { setDraft(row); setEditing(row.id); }}>{t('common.edit')}</button>
@@ -436,7 +482,7 @@ function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
             <Field label={t('adm.tag')}>
               <select className="input" value={draft.tag} onChange={e => setDraft({ ...draft, tag: e.target.value })}>
                 {['news', 'publication', 'grant', 'outreach', 'facility', 'award', 'people'].map(tag => (
-                  <option key={tag} value={tag}>{t(`news.tag.${tag}` as any)}</option>
+                  <option key={tag} value={tag}>{tv('news.tag', tag)}</option>
                 ))}
               </select>
             </Field>
@@ -453,11 +499,15 @@ function NewsEditor({ rows, onDone }: { rows: NewsRow[]; onDone: () => void }) {
   );
 }
 
-const EMPTY_PERSON = { name_mk: '', name_en: '', role_mk: '', role_en: '', seniority: 'phd', email: '', joined_year: new Date().getFullYear(), hue: 140 };
+type PersonDraft = {
+  name_mk: string; name_en: string; role_mk: string; role_en: string; seniority: string;
+  email: string | null; interests_mk: string | null; interests_en: string | null; joined_year: number; hue?: number;
+};
+const EMPTY_PERSON: PersonDraft = { name_mk: '', name_en: '', role_mk: '', role_en: '', seniority: 'phd', email: '', interests_mk: '', interests_en: '', joined_year: new Date().getFullYear(), hue: 140 };
 
 function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void }) {
-  const { t, f } = useLang();
-  const [draft, setDraft] = useState<any>(EMPTY_PERSON);
+  const { t, f, tv } = useLang();
+  const [draft, setDraft] = useState<PersonDraft>(EMPTY_PERSON);
   const [editing, setEditing] = useState<number | null>(null);
   const { run, busy, notice } = useMutation(onDone);
 
@@ -486,7 +536,7 @@ function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void 
               <Card className="p-4 flex flex-wrap items-baseline gap-4">
                 <div className="min-w-0 flex-1">
                   <h3 className="text-[14px]">{f(row, 'name')}</h3>
-                  <p className="label mt-1">{f(row, 'role')} · {t(`team.seniority.${row.seniority}` as any)}</p>
+                  <p className="label mt-1">{f(row, 'role')} · {tv('team.seniority', row.seniority)}</p>
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button type="button" className="btn btn-sm" onClick={() => { setDraft(row); setEditing(row.id); }}>{t('common.edit')}</button>
@@ -518,7 +568,7 @@ function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void 
             <Field label={t('adm.seniority')}>
               <select className="input" value={draft.seniority} onChange={e => setDraft({ ...draft, seniority: e.target.value })}>
                 {['faculty', 'postdoc', 'staff', 'phd', 'msc'].map(level => (
-                  <option key={level} value={level}>{t(`team.seniority.${level}` as any)}</option>
+                  <option key={level} value={level}>{tv('team.seniority', level)}</option>
                 ))}
               </select>
             </Field>
@@ -528,6 +578,12 @@ function PeopleEditor({ rows, onDone }: { rows: PersonRow[]; onDone: () => void 
           </div>
           <Field label={t('common.email')}>
             <input className="input" type="email" value={draft.email ?? ''} onChange={e => setDraft({ ...draft, email: e.target.value })} />
+          </Field>
+          <Field label={`${t('team.interests')} ${t('adm.suffixmk')}`} hint={t('adm.keywordshint')}>
+            <input className="input" value={draft.interests_mk ?? ''} onChange={e => setDraft({ ...draft, interests_mk: e.target.value })} />
+          </Field>
+          <Field label={`${t('team.interests')} ${t('adm.suffixen')}`}>
+            <input className="input" value={draft.interests_en ?? ''} onChange={e => setDraft({ ...draft, interests_en: e.target.value })} />
           </Field>
           <div className="flex gap-2">
             <button type="submit" className="btn btn-primary flex-1 justify-center" disabled={busy || !draft.name_mk || !draft.name_en}>

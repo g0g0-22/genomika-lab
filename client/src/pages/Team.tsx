@@ -1,26 +1,22 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLang } from '../i18n';
+import { initials } from '../lib/names';
 import { useFetch } from '../lib/useFetch';
-import { PageHeader, Card, Label, Loading, ErrorBox, Empty, accentVar } from '../components/ui';
+import { PageHeader, Card, Loading, ErrorBox, Empty, accentVar } from '../components/ui';
 
 type Person = {
   id: number; slug: string; hue: number; seniority: string; joined_year: number;
   name_mk: string; name_en: string; role_mk: string; role_en: string;
-  interests: string; email: string; accent: string;
+  interests_mk: string; interests_en: string; email: string; accent: string;
   group_slug: string; group_name_mk: string; group_name_en: string;
 };
 
 const ORDER = ['faculty', 'postdoc', 'staff', 'phd', 'msc'] as const;
 
-export function Avatar({ person, size = 46 }: { person: Person; size?: number }) {
+export function Avatar({ person, size = 46 }: { person: Pick<Person, 'name_mk' | 'name_en' | 'hue'>; size?: number }) {
   const { f } = useLang();
-  const initials = f(person, 'name')
-    .replace(/^(проф\.|д-р|Prof\.|Dr\.)\s*/i, '')
-    .split(' ')
-    .map(w => w[0])
-    .slice(0, 2)
-    .join('');
+  const letters = initials(f(person, 'name'));
   return (
     <span
       className="rounded-full shrink-0 grid place-items-center num font-semibold"
@@ -32,13 +28,13 @@ export function Avatar({ person, size = 46 }: { person: Person; size?: number })
       }}
       aria-hidden="true"
     >
-      {initials}
+      {letters}
     </span>
   );
 }
 
 export default function Team() {
-  const { t, f } = useLang();
+  const { t, f, tv } = useLang();
   const [query, setQuery] = useState('');
   const [group, setGroup] = useState('');
   const people = useFetch<Person[]>(
@@ -88,7 +84,7 @@ export default function Team() {
         {grouped.map(section => (
           <section key={section.level}>
             <h2 className="label mb-6 pb-2 border-b border-line">
-              {t(`team.seniority.${section.level}` as any)} · {section.members.length}
+              {tv('team.seniority', section.level)} · {section.members.length}
             </h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {section.members.map((person, i) => (
@@ -110,7 +106,7 @@ export default function Team() {
                       </span>
                     )}
                     <p className="mt-3 text-[12px] leading-relaxed text-muted line-clamp-2">
-                      {person.interests?.split(';').join(' · ')}
+                      {f(person, 'interests').split(';').join(' · ')}
                     </p>
                   </Card>
                 </Link>

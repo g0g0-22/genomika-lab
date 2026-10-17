@@ -1,11 +1,11 @@
 import express from 'express';
-import cors from 'cors';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { authenticate, issueToken, publicUser, readToken, requireAuth,
          throttleKey, tooManyAttempts, recordFailure, clearAttempts } from './lib/auth.js';
+import { listedDemoLogins } from './lib/demo.js';
 import { content } from './routes/content.js';
 import { events } from './routes/events.js';
 import { booking } from './routes/booking.js';
@@ -22,15 +22,25 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export function createApp({ quiet = false } = {}) {
   const app = express();
 
+  app.disable('x-powered-by');
+
   /*
-   * nginx and the platform's ingress sit in front of this process. Trusting the
-   * private-network hops lets req.ip resolve to the real client: Express reads
-   * X-Forwarded-For from the right and stops at the first address that is not
-   * a trusted proxy, so a value a client forges on the left is never reached.
+   * Exactly one proxy sits in front of this process: the nginx web tier, which
+   * replaces X-Forwarded-For with the single client address it has itself
+   * established (see client/nginx.conf). Trusting one hop therefore makes
+   * req.ip that address. Trusting whole private ranges instead let a client's
+   * own X-Forwarded-For through whenever the hop before nginx was private.
+   *
+   * No CORS middleware: the browser only ever talks to the origin nginx serves,
+   * and the Vite dev server proxies /api, so cross-origin access is never needed.
    */
-  app.set('trust proxy', 'loopback, linklocal, uniquelocal');
-  app.use(cors());
-  app.use(express.json({ limit: '6mb' }));
+  app.set('trust proxy', 1);
+
+  // Only a CV upload carries a large body; everything else is a few fields.
+  const smallJson = express.json({ limit: '100kb' });
+  const uploadJson = express.json({ limit: '6mb' });
+  app.use((req, res, next) =>
+    (/^\/api\/positions\/[^/]+\/apply$/.test(req.path) ? uploadJson : smallJson)(req, res, next));
   app.use(readToken);
 
   // A repeated query key (?group=a&group=b) arrives as an array, which every
@@ -68,6 +78,9 @@ export function createApp({ quiet = false } = {}) {
   });
 
   app.get('/api/auth/me', requireAuth, (req, res) => res.json({ user: publicUser(req.user) }));
+
+  // The demo logins this deployment chooses to advertise (DEMO_LOGINS); often none.
+  app.get('/api/auth/demo', (_req, res) => res.json({ accounts: listedDemoLogins() }));
 
   /* ---------------------------------------------------------------- ROUTES */
   app.use('/api', content);

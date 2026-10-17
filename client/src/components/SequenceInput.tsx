@@ -7,7 +7,7 @@ import { Label } from './ui';
  * a one-click example. The example button matters — a visitor who has to find
  * a sequence before the tool does anything usually never sees it work.
  */
-export function SequenceInput({ value, onChange, onExample, label, placeholder, rows = 6, extra, dropped, records, firstId, protein }: {
+export function SequenceInput({ value, onChange, onExample, label, placeholder, rows = 6, extra, dropped, ambiguous, records, firstId, protein }: {
   value: string;
   onChange: (v: string) => void;
   onExample?: () => void;
@@ -16,6 +16,8 @@ export function SequenceInput({ value, onChange, onExample, label, placeholder, 
   rows?: number;
   extra?: React.ReactNode;
   dropped?: number;
+  /** Ambiguity codes that were read as N. */
+  ambiguous?: number;
   /** How many FASTA records the input holds; only the first is analysed. */
   records?: number;
   firstId?: string;
@@ -66,8 +68,12 @@ export function SequenceInput({ value, onChange, onExample, label, placeholder, 
       />
       {protein ? (
         <p className="mt-2 text-[12px] text-srose" role="status">{t('seq.isprotein')}</p>
-      ) : dropped ? (
-        <p className="mt-1.5 text-[11px] text-srose">{t('seq.invalid')} ({dropped})</p>
+      ) : null}
+      {!protein && dropped ? (
+        <p className="mt-1.5 text-[12px] text-srose" role="status">{t('seq.invalid').replace('{n}', String(dropped))}</p>
+      ) : null}
+      {!protein && ambiguous ? (
+        <p className="mt-1.5 text-[12px] text-muted" role="status">{t('seq.ambiguous').replace('{n}', String(ambiguous))}</p>
       ) : null}
       {records && records > 1 ? (
         <p className="mt-1.5 text-[11.5px] text-muted" role="status">

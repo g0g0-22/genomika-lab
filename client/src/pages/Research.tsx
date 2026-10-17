@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLang } from '../i18n';
 import { useFetch } from '../lib/useFetch';
-import { PageHeader, Card, Label, Loading, ErrorBox, Empty, Toggle, accentVar, DnaStrip } from '../components/ui';
+import { PageHeader, Loading, ErrorBox, Empty, Toggle, accentVar } from '../components/ui';
 
 type Group = {
   id: number; slug: string; accent: string; founded: number;
@@ -20,7 +20,7 @@ type Project = {
 };
 
 export default function Research() {
-  const { t, f, s, formatDate, formatNumber } = useLang();
+  const { t, f, s, formatDate, formatNumber, tv } = useLang();
   const [status, setStatus] = useState('');
   const groups = useFetch<Group[]>('/groups');
   const projects = useFetch<Project[]>(`/projects${status ? `?status=${status}` : ''}`, [status]);
@@ -80,7 +80,7 @@ export default function Research() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="chip" style={{ borderColor: accentVar(project.accent), color: accentVar(project.accent) }}>
-                      {t(`research.status.${project.status}` as any)}
+                      {tv('research.status', project.status)}
                     </span>
                     <Link to={`/research/${project.group_slug}`} className="chip hover:text-accent">
                       {f(project, 'group_name')}

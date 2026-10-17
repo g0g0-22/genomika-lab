@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { requireAuth } from '../lib/auth.js';
 import { localDate, isRealDate, daysFromToday } from '../lib/dates.js';
+import { MAX } from '../lib/limits.js';
 
 /** How far ahead a slot may be reserved, and how many a person may hold. */
 const MAX_DAYS_AHEAD = 180;
@@ -9,19 +10,19 @@ const MAX_ACTIVE_PER_USER = 20;
 
 export const booking = Router();
 
+const isTrained = (userId, instrumentId) =>
+  Boolean(db.prepare('SELECT 1 FROM instrument_training WHERE user_id = ? AND instrument_id = ?').get(userId, instrumentId));
 
 booking.get('/instruments', (req, res) => {
   const { category } = req.query;
   let sql = 'SELECT * FROM instruments WHERE 1=1';
   const params = [];
   if (category) { sql += ' AND category = ?'; params.push(category); }
-  res.json(db.prepare(`${sql} ORDER BY category, name_en`).all(...params));
-});
-
-booking.get('/instruments/:slug', (req, res) => {
-  const row = db.prepare('SELECT * FROM instruments WHERE slug = ?').get(req.params.slug);
-  if (!row) return res.status(404).json({ error: 'not_found' });
-  res.json(row);
+  const rows = db.prepare(`${sql} ORDER BY category, name_en`).all(...params);
+  // For a signed-in caller, whether they may book each instrument themselves.
+  res.json(req.user
+    ? rows.map(r => ({ ...r, trained: !r.requires_training || isTrained(req.user.id, r.id) }))
+    : rows);
 });
 
 /** Occupancy for one instrument on one day, hour by hour. */
@@ -65,7 +66,12 @@ booking.get('/instruments/:slug/availability', (req, res) => {
         : null
     });
   }
-  res.json({ instrument, date, slots, bookings: signedIn ? rows : [] });
+  res.json({
+    instrument: signedIn
+      ? { ...instrument, trained: !instrument.requires_training || isTrained(req.user.id, instrument.id) }
+      : instrument,
+    date, slots, bookings: signedIn ? rows : []
+  });
 });
 
 booking.get('/bookings/mine', requireAuth, (req, res) => {
@@ -81,7 +87,15 @@ booking.post('/bookings', requireAuth, (req, res) => {
   const instrument = db.prepare('SELECT * FROM instruments WHERE slug = ?').get(String(instrument_slug || ''));
   if (!instrument) return res.status(404).json({ error: 'unknown_instrument' });
   if (instrument.status !== 'available') return res.status(409).json({ error: 'instrument_unavailable' });
+  if (instrument.requires_training && !isTrained(req.user.id, instrument.id)) {
+    return res.status(403).json({ error: 'training_required' });
+  }
   if (!isRealDate(date)) return res.status(400).json({ error: 'invalid_date' });
+
+  // A note for the facility, so a short string or nothing — never an object
+  // that would be stored as "[object Object]".
+  if (purpose != null && typeof purpose !== 'string') return res.status(400).json({ error: 'invalid_purpose' });
+  if (purpose && purpose.length > MAX.subject) return res.status(400).json({ error: 'purpose_too_long', max: MAX.subject });
 
   const s = Number(start_hour), e = Number(end_hour);
   if (!Number.isInteger(s) || !Number.isInteger(e) || e <= s) return res.status(400).json({ error: 'invalid_range' });
@@ -119,7 +133,7 @@ booking.post('/bookings', requireAuth, (req, res) => {
      VALUES (?,?,?,?,?,?,?,?,'confirmed')`
   ).run(
     instrument.id, req.user.id, displayName,
-    req.user.email, date, s, e, String(purpose || '').slice(0, 300)
+    req.user.email, date, s, e, purpose?.trim() || null
   );
 
   res.status(201).json({

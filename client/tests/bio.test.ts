@@ -3,9 +3,11 @@
  *
  *   node --experimental-strip-types --test tests/bio.test.ts
  *
- * Expected values come from the biology rather than from the code: the
- * beta-globin protein, EcoRI's recognition site, OligoCalc's masses. They can
- * be checked against any reference implementation.
+ * Expected values are not read off this code's own output. They are either
+ * published facts (the beta-globin protein, OligoCalc's masses, textbook
+ * enzyme ends) or derived here by a different, deliberately naive method —
+ * cut positions by a literal string search plus the enzyme's cut offset — so
+ * the library and the expectation cannot share a bug.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,8 +17,8 @@ import {
   gcContent, meltingTemp, molecularWeight, parseFasta, cleanSequence, detectKind, toFasta,
   IUPAC_DNA_ALPHABET, formatMass, meltingTempApplies, classifyInput
 } from '../src/lib/bio/sequence.ts';
-import { bibtexAuthors, latexEscape, toBibtex } from '../src/lib/bibtex.ts';
-import { ENZYMES, findCutSites, digest, migration, recognitionSequence, GEL_RANGES } from '../src/lib/bio/enzymes.ts';
+import { bibtexAuthors, latexEscape, toBibtex, toBibtexFile, citationKey } from '../src/lib/bibtex.ts';
+import { ENZYMES, findCutSites, digest, migration, recognitionSequence, GEL_RANGES, overhang } from '../src/lib/bio/enzymes.ts';
 import { HBB_CDS, PLASMID_FRAGMENT } from '../src/lib/bio/samples.ts';
 
 /* ------------------------------------------------------------- sequence -- */
@@ -40,9 +42,22 @@ test('a stray residue from the other alphabet still has mass', () => {
 
 test('raw input is classified before alphabet cleaning', () => {
   assert.equal(classifyInput(HBB_CDS), 'dna');
+  // Most amino-acid letters are also IUPAC nucleotide codes (M, K, V, H …), so
+  // a protein has to be recognised before any cleaning turns it into "DNA".
   assert.equal(classifyInput('MVHLTPEEKSAVTALWGKVNVDEVGGEALGRLLVVYPWTQRFF'), 'protein');
-  // The bug: cleaning a protein with the DNA alphabet left a short "DNA" string.
-  assert.equal(detectKind(cleanSequence('MVHLTPEEKSAVTALWGKV').seq), 'dna');
+});
+
+test('an ambiguity code keeps its place as N instead of shifting the frame', () => {
+  const withR = HBB_CDS.slice(0, 21) + 'R' + HBB_CDS.slice(22);     // codon 8 (GAG, Glu) becomes RAG
+  const { seq, ambiguous, dropped } = cleanSequence(withR);
+  assert.equal(seq.length, HBB_CDS.length, 'no position is lost');
+  assert.deepEqual([ambiguous, dropped], [1, 0]);
+  // The unknown codon is X; everything after it is still in frame.
+  assert.ok(translate(seq).startsWith('MVHLTPEXKSAVTALWGKV'));
+  assert.equal(findOrfs(seq, 30)[0].protein.length, 147);
+
+  assert.deepEqual(cleanSequence('ACGT-ZZ-ACGT'), { seq: 'ACGTACGT', ambiguous: 0, dropped: 2 },
+    'characters that are no nucleotide code at all are the only ones dropped');
 });
 
 test('transcription replaces T with U', () => {
@@ -133,8 +148,8 @@ test('all six reading frames are produced, in the conventional order', () => {
 });
 
 test('the IUPAC alphabet survives cleaning when it is asked for', () => {
-  assert.deepEqual(cleanSequence('ATGCRYKM'), { seq: 'ATGC', dropped: 4 });
-  assert.deepEqual(cleanSequence('ATGCRYKM', IUPAC_DNA_ALPHABET), { seq: 'ATGCRYKM', dropped: 0 });
+  assert.deepEqual(cleanSequence('ATGCRYKM'), { seq: 'ATGCNNNN', ambiguous: 4, dropped: 0 });
+  assert.deepEqual(cleanSequence('ATGCRYKM', IUPAC_DNA_ALPHABET), { seq: 'ATGCRYKM', ambiguous: 0, dropped: 0 });
 });
 
 test('degenerate recognition sites match every base they stand for', () => {
@@ -206,11 +221,18 @@ test('a linear digest of the same sequence gives one more fragment than cuts', (
   assert.equal(fragments.reduce((sum, f) => sum + f.length, 0), PLASMID_FRAGMENT.length);
 });
 
+/** Cut positions by plain substring search: no regex, no IUPAC expansion. */
+function naiveCuts(seq: string, site: string, offset: number) {
+  const cuts: number[] = [];
+  for (let i = seq.indexOf(site); i !== -1; i = seq.indexOf(site, i + 1)) cuts.push(i + offset);
+  return cuts;
+}
+
 test('EcoRI cuts the demo fragment exactly twice', () => {
   const ecoRI = ENZYMES.find(e => e.name === 'EcoRI')!;
   const sites = findCutSites(PLASMID_FRAGMENT, [ecoRI]);
-  assert.equal(sites.length, 2);
-  assert.deepEqual(sites.map(s => s.position), [1, 46]);
+  assert.deepEqual(sites.map(s => s.position), naiveCuts(PLASMID_FRAGMENT, 'GAATTC', 1));
+  assert.deepEqual(sites.map(s => s.position), [1, 46], 'G^AATTC at 0 and 45');
 });
 
 test('a digest partitions the sequence with nothing lost', () => {
@@ -279,7 +301,39 @@ test('the gel example is a digest whose every fragment resolves on its gel', () 
   // the example must still show bands rather than run-off notes.
   const enzymes = ENZYMES.filter(e => e.name === 'PvuII' || e.name === 'NdeI');
   const lengths = digest(PLASMID_FRAGMENT, findCutSites(PLASMID_FRAGMENT, enzymes)).map(f => f.length);
+
+  // The same fragments from naive cuts: consecutive differences, largest first.
+  const cuts = [...naiveCuts(PLASMID_FRAGMENT, 'CAGCTG', 3), ...naiveCuts(PLASMID_FRAGMENT, 'CATATG', 2)].sort((a, b) => a - b);
+  const bounds = [0, ...cuts, PLASMID_FRAGMENT.length];
+  const expected = bounds.slice(1).map((end, i) => end - bounds[i]).sort((a, b) => b - a);
+  assert.deepEqual(lengths, expected);
   assert.deepEqual(lengths, [349, 191, 138, 122]);
   const [min, max] = GEL_RANGES['2.0'];
   assert.ok(lengths.every(l => l >= min && l <= max));
+});
+
+test('every site is palindromic, so overhangs follow from the cut position', () => {
+  const COMPLEMENT = { A: 'T', T: 'A', C: 'G', G: 'C', R: 'Y', Y: 'R', S: 'S', W: 'W',
+                       K: 'M', M: 'K', B: 'V', V: 'B', D: 'H', H: 'D', N: 'N' };
+  for (const enzyme of ENZYMES) {
+    const site = recognitionSequence(enzyme);
+    const reverseComplementSite = site.split('').reverse().map(c => COMPLEMENT[c]).join('');
+    assert.equal(reverseComplementSite, site, `${enzyme.name} reads the same on both strands`);
+  }
+  // Textbook ends, one of each kind, plus ScrFI's one-base 5' overhang.
+  const end = (name) => overhang(ENZYMES.find(e => e.name === name));
+  assert.deepEqual(['EcoRI', 'PstI', 'SmaI', 'ScrFI', 'NotI'].map(end), ["5'", "3'", 'blunt', "5'", "5'"]);
+});
+
+test('BibTeX keeps name particles with the surname and gives every entry its own ASCII key', () => {
+  assert.equal(bibtexAuthors('van der Berg J, Trajkovska AB'), 'van der Berg, J. and Trajkovska, A. B.');
+  assert.equal(bibtexAuthors('GenomikaLab Consortium'), 'GenomikaLab Consortium');
+
+  const base = { venue: 'V', year: 2024, type: 'article' };
+  assert.equal(citationKey({ ...base, title: 'Геномски графови на ендемити', authors: 'Трајковска А' }),
+    'trajkovska2024genomski', 'Macedonian names and titles are transliterated, not dropped');
+
+  const twin = { ...base, title: 'Graph pangenomes', authors: 'Doe J' };
+  const keys = [...toBibtexFile([twin, twin, twin]).matchAll(/^@article\{([^,]+),/gm)].map(m => m[1]);
+  assert.deepEqual(keys, ['doe2024graph', 'doe2024grapha', 'doe2024graphb']);
 });

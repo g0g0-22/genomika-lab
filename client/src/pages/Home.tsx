@@ -36,7 +36,7 @@ function Opener({ index, title, sub, right }: { index: string; title: string; su
 }
 
 export default function Home() {
-  const { t, f, s, formatDate, formatNumber } = useLang();
+  const { t, f, s, formatDate, formatNumber, tv } = useLang();
   const groups = useFetch<Group[]>('/groups');
   const news = useFetch<NewsItem[]>('/news?limit=3');
   const events = useFetch<EventItem[]>('/events?scope=upcoming');
@@ -83,7 +83,7 @@ export default function Home() {
           right={<ArrowLink to="/research">{t('research.title')}</ArrowLink>}
         />
         <div className="grid md:grid-cols-3">
-          {groups.data?.map((group, i) => (
+          {groups.data?.map((group) => (
             <Link
               key={group.id}
               to={`/research/${group.slug}`}
@@ -160,7 +160,7 @@ export default function Home() {
                 <Link to="/news" className="group block py-6">
                   <div className="flex items-baseline gap-4">
                     <span className="label shrink-0">{formatDate(item.date, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                    <span className="label">{t(`news.tag.${item.tag}` as any)}</span>
+                    <span className="label">{tv('news.tag', item.tag)}</span>
                   </div>
                   <h3 className="mt-3 text-[1.05rem] leading-snug group-hover:text-accent transition-colors">
                     {f(item, 'title')}

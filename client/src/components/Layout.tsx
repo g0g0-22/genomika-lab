@@ -285,6 +285,21 @@ function Footer() {
   );
 }
 
+/* -------------------------------------------------------- SESSION ENDED */
+
+function SessionEnded() {
+  const { t } = useLang();
+  const { expired, dismissExpired } = useAuth();
+  if (!expired) return null;
+  return (
+    <div className="mb-10 card p-4 flex flex-wrap items-center gap-4" role="alert">
+      <p className="text-[13.5px] flex-1 min-w-[200px]">{t('auth.expired')}</p>
+      <Link to="/login" className="btn btn-sm btn-primary" onClick={dismissExpired}>{t('nav.login')} →</Link>
+      <button type="button" className="btn btn-sm" onClick={dismissExpired}>{t('common.close')}</button>
+    </div>
+  );
+}
+
 /* --------------------------------------------------------------- LAYOUT */
 
 export default function Layout() {
@@ -298,6 +313,7 @@ export default function Layout() {
       <a href="#main" className="skip-link">{t('nav.skip')}</a>
       <Nav />
       <main id="main" className="flex-1 mx-auto w-full max-w-[1280px] px-6 md:px-10 py-16 md:py-24">
+        <SessionEnded />
         <Outlet />
       </main>
       <Footer />

@@ -16,8 +16,24 @@ db.pragma('foreign_keys = ON');
  * MIGRATIONS and runs once, in order, recorded in SQLite's own user_version.
  */
 const MIGRATIONS = [
-  // 1 — baseline: the schema created below.
-  () => {}
+  // 1 — baseline: the schema created below. Never edited; later changes are new steps.
+  () => {},
+
+  // 2 — interests in both languages; uploaded CVs keep their original name
+  //     apart from the storage key; who is trained on which instrument; and
+  //     projects lose the stored status that projects_live now derives.
+  () => db.exec(`
+    ALTER TABLE people RENAME COLUMN interests TO interests_mk;
+    ALTER TABLE people ADD COLUMN interests_en TEXT;
+    ALTER TABLE applications ADD COLUMN cv_original_name TEXT;
+    CREATE TABLE instrument_training (
+      user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      instrument_id INTEGER NOT NULL REFERENCES instruments(id) ON DELETE CASCADE,
+      granted_at    TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+      PRIMARY KEY (user_id, instrument_id)
+    );
+    ALTER TABLE projects DROP COLUMN status;
+  `)
 ];
 
 export function migrate() {

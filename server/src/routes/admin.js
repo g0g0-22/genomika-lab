@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { db } from '../db.js';
 import { requireAdmin } from '../lib/auth.js';
 import { localDate } from '../lib/dates.js';
-import { validate, text, int, num, bool, oneOf, date, pattern, ref } from '../lib/validate.js';
+import { linkAuthors } from '../lib/authors.js';
+import { validate, text, int, bool, oneOf, date, pattern, ref } from '../lib/validate.js';
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR
   || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'uploads');
@@ -27,6 +28,10 @@ admin.get('/overview', (_req, res) => {
       (SELECT COUNT(*) FROM applications) applications,
       (SELECT COUNT(*) FROM messages WHERE handled = 0) unread_messages,
       (SELECT COUNT(*) FROM rsvps) rsvps`).get(),
+    // The inbox lists the latest 20 of each; these say how many there are in all.
+    inboxTotals: db.prepare(`SELECT
+      (SELECT COUNT(*) FROM applications) applications,
+      (SELECT COUNT(*) FROM messages) messages`).get(),
     recentApplications: db.prepare(
       `SELECT a.*, p.title_en AS position_en, p.title_mk AS position_mk FROM applications a
        JOIN positions p ON p.id = a.position_id ORDER BY a.created_at DESC LIMIT 20`).all(),
@@ -91,23 +96,13 @@ const PERSON = {
   orcid: pattern(/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/),
   github: pattern(/^[A-Za-z0-9-]{1,39}$/),
   bio_mk: text({ max: 4000 }), bio_en: text({ max: 4000 }),
-  interests: text({ max: 500 }),
+  interests_mk: text({ max: 500 }), interests_en: text({ max: 500 }),
   joined_year: int({ min: 1950, max: THIS_YEAR + 1 }),
   hue: int({ min: 0, max: 360 })
 };
 /* role_* are NOT NULL in the schema; an empty role is an empty string. */
-const PERSON_DEFAULTS = { seniority: 'researcher', role_mk: '', role_en: '', hue: 140, joined_year: THIS_YEAR };
-
-const DATASET = {
-  title_mk: text({ required: true, max: 300 }), title_en: text({ required: true, max: 300 }),
-  description_mk: text({ max: 4000 }), description_en: text({ max: 4000 }),
-  format: text({ required: true, max: 60 }),
-  size_mb: num({ min: 0, max: 10_000_000 }),
-  license: text({ required: true, max: 60 }),
-  year: int({ min: 1900, max: THIS_YEAR + 1 }),
-  doi: pattern(/^10\.\d{4,9}\/\S+$/, { max: 120 }),
-  organism: text({ max: 200 })
-};
+// The seniority default is one of SENIORITY — an unlisted value was stored, hidden from /team, and then refused on update.
+const PERSON_DEFAULTS = { seniority: 'phd', role_mk: '', role_en: '', hue: 140, joined_year: THIS_YEAR };
 
 const invalid = (res, errors) => res.status(400).json({ error: 'validation_failed', fields: errors });
 const isUnique = (err) => String(err?.code || err?.message).includes('UNIQUE');
@@ -136,8 +131,12 @@ admin.post('/publications', (req, res) => {
   if (!ok) return invalid(res, errors);
   const fields = { ...value };
   for (const [k, v] of Object.entries(PUBLICATION_DEFAULTS)) if (fields[k] === null) fields[k] = v;
-  const info = insert('publications', fields);
-  res.status(201).json(db.prepare('SELECT * FROM publications WHERE id = ?').get(info.lastInsertRowid));
+  const id = db.transaction(() => {
+    const { lastInsertRowid } = insert('publications', fields);
+    linkAuthors(lastInsertRowid, fields.authors);
+    return lastInsertRowid;
+  })();
+  res.status(201).json(db.prepare('SELECT * FROM publications WHERE id = ?').get(id));
 });
 
 admin.put('/publications/:id', (req, res) => {
@@ -145,7 +144,10 @@ admin.put('/publications/:id', (req, res) => {
   if (!existing) return res.status(404).json({ error: 'not_found' });
   const { value, errors, ok } = validate(PUBLICATION, req.body, { partial: true });
   if (!ok) return invalid(res, errors);
-  update('publications', existing.id, withoutNulls(value, ['doi', 'abstract', 'group_id', 'keywords']));
+  db.transaction(() => {
+    update('publications', existing.id, withoutNulls(value, ['doi', 'abstract', 'group_id', 'keywords']));
+    if (value.authors) linkAuthors(existing.id, value.authors);
+  })();
   res.json(db.prepare('SELECT * FROM publications WHERE id = ?').get(existing.id));
 });
 
@@ -198,17 +200,6 @@ admin.delete('/news/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-/* ------------------------------------------------------------- DATASETS */
-
-admin.put('/datasets/:id', (req, res) => {
-  const existing = db.prepare('SELECT id FROM datasets WHERE id = ?').get(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'not_found' });
-  const { value, errors, ok } = validate(DATASET, req.body, { partial: true });
-  if (!ok) return invalid(res, errors);
-  update('datasets', existing.id, withoutNulls(value, ['description_mk', 'description_en', 'doi', 'organism']));
-  res.json(db.prepare('SELECT * FROM datasets WHERE id = ?').get(existing.id));
-});
-
 /* ---------------------------------------------------------------- PEOPLE */
 
 admin.post('/people', (req, res) => {
@@ -232,7 +223,7 @@ admin.put('/people/:id', (req, res) => {
   if (!ok) return invalid(res, errors);
   try {
     update('people', existing.id, withoutNulls(value,
-      ['group_id', 'email', 'orcid', 'github', 'bio_mk', 'bio_en', 'interests', 'joined_year']));
+      ['group_id', 'email', 'orcid', 'github', 'bio_mk', 'bio_en', 'interests_mk', 'interests_en', 'joined_year']));
   } catch (err) {
     if (isUnique(err)) return res.status(409).json({ error: 'slug_taken' });
     throw err;
@@ -253,7 +244,7 @@ admin.delete('/people/:id', (req, res) => {
  * directory, however it got there.
  */
 admin.get('/applications/:id/cv', (req, res) => {
-  const row = db.prepare('SELECT cv_filename FROM applications WHERE id = ?').get(req.params.id);
+  const row = db.prepare('SELECT cv_filename, cv_original_name FROM applications WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'not_found' });
   if (!row.cv_filename) return res.status(404).json({ error: 'no_cv_attached' });
 
@@ -261,10 +252,13 @@ admin.get('/applications/:id/cv', (req, res) => {
   if (!target.startsWith(resolve(UPLOAD_DIR) + '/')) return res.status(400).json({ error: 'invalid_path' });
   if (!existsSync(target)) return res.status(410).json({ error: 'file_missing' });
 
-  // Stored as <timestamp>-<original>; the administrator gets the applicant's
-  // reference and the original name instead of the storage key.
+  // Stored under a random key with a vetted extension, which also fixes the
+  // Content-Type; the administrator receives it named by reference and the
+  // applicant's original name, always as an attachment.
   const reference = `GL-${String(req.params.id).padStart(5, '0')}`;
-  res.download(target, `${reference}-${row.cv_filename.replace(/^\d+-/, '')}`);
+  const extension = row.cv_filename.split('.').pop();
+  const original = (row.cv_original_name || 'cv').replace(/\.[^.]*$/, '');
+  res.download(target, `${reference}-${original}.${extension}`);
 });
 
 /* ---------------------------------------------------------- INBOX ACTIONS */

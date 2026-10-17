@@ -65,7 +65,7 @@ export function BarChart({ data, height = 200, valueSuffix = '', color = 'var(--
                 role="img"
                 aria-label={`${d.label}: ${d.value}${valueSuffix}`}
               />
-              <span className="num text-[9px] mt-1.5 text-muted truncate w-full text-center">{d.label}</span>
+              <span className="num text-[10.5px] mt-1.5 text-muted truncate w-full text-center">{d.label}</span>
             </div>
           );
         })}
@@ -124,7 +124,7 @@ export function LineChart({ data, height = 180, valueSuffix = '', color = 'var(-
         {ticks.map(tick => (
           <g key={tick}>
             <line x1={pad.left} x2={width - pad.right} y1={y(tick)} y2={y(tick)} stroke="var(--line)" strokeWidth="1" />
-            <text x={pad.left - 6} y={y(tick) + 3} textAnchor="end" className="num" fontSize="9" fill="var(--muted)">{tick}</text>
+            <text x={pad.left - 6} y={y(tick) + 3} textAnchor="end" className="num" fontSize="10.5" fill="var(--muted)">{tick}</text>
           </g>
         ))}
 
@@ -145,7 +145,7 @@ export function LineChart({ data, height = 180, valueSuffix = '', color = 'var(-
 
         {data.map((d, i) => (
           (i === 0 || i === data.length - 1 || data.length <= 8) && (
-            <text key={`l${i}`} x={x(i)} y={height - 8} textAnchor="middle" className="num" fontSize="9" fill="var(--muted)">
+            <text key={`l${i}`} x={x(i)} y={height - 8} textAnchor="middle" className="num" fontSize="10.5" fill="var(--muted)">
               {d.label}
             </text>
           )
@@ -219,7 +219,7 @@ export function Donut({ segments, size = 150, caption }: {
           {Math.round((segments[0]?.value / total) * 100)}%
         </text>
         {caption && (
-          <text x={size / 2} y={size / 2 + 14} textAnchor="middle" fontSize="8"
+          <text x={size / 2} y={size / 2 + 14} textAnchor="middle" fontSize="10"
                 fill="var(--muted)" letterSpacing="1.4" className="num">
             {caption.toUpperCase()}
           </text>
@@ -258,7 +258,7 @@ export function Gantt({ rows, formatDate }: { rows: GanttRow[]; formatDate: (iso
     <div className="relative" ref={ref} onMouseLeave={hide}>
       <div className="relative mb-2 h-4">
         {years.map(y => pct(`${y}-01-01`) >= 0 && pct(`${y}-01-01`) <= 100 && (
-          <span key={y} className="num text-[9px] text-muted absolute -translate-x-1/2"
+          <span key={y} className="num text-[10.5px] text-muted absolute -translate-x-1/2"
                 style={{ left: `${pct(`${y}-01-01`)}%` }}>
             {y}
           </span>

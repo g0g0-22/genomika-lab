@@ -1,5 +1,6 @@
 const BASE = '/api';
 const TOKEN_KEY = 'genomika.token';
+export const SESSION_ENDED = 'genomika:session-ended';
 
 export function getToken(): string | null {
   try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
@@ -23,13 +24,20 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T = any>(path: string, init: RequestInit = {}): Promise<T> {
+export async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
   if (init.body) headers['Content-Type'] = 'application/json';
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(BASE + path, { ...init, headers });
+  // A token the server no longer accepts (expired, or the secret changed):
+  // forget it and tell the app, rather than keep showing a signed-in user
+  // whose every action now fails.
+  if (res.status === 401 && token) {
+    setToken(null);
+    window.dispatchEvent(new Event(SESSION_ENDED));
+  }
   if (!res.ok) {
     let code = `http_${res.status}`;
     let fields: Record<string, string> | undefined;
@@ -45,14 +53,25 @@ export async function api<T = any>(path: string, init: RequestInit = {}): Promis
 }
 
 /** Turns a server field-error code into a sentence, in the current language. */
-export const fieldError = (t: (key: any) => string, code?: string) =>
-  code ? t(`err.field.${code}`) : undefined;
+export const fieldError = (tv: (prefix: string, value: string) => string, code?: string) =>
+  code ? tv('err.field', code) : undefined;
 
-export const post = <T = any>(path: string, body: unknown) =>
+/** Every page of a paged listing; the server returns at most 50 rows a page. */
+export async function fetchAllPages<T>(path: string, query: Record<string, string> = {}): Promise<T[]> {
+  const items: T[] = [];
+  for (let page = 1; ; page++) {
+    const result = await api<{ items: T[]; total: number }>(
+      `${path}?${new URLSearchParams({ ...query, limit: '50', page: String(page) })}`);
+    items.push(...result.items);
+    if (result.items.length === 0 || items.length >= result.total) return items;
+  }
+}
+
+export const post = <T = unknown>(path: string, body: unknown) =>
   api<T>(path, { method: 'POST', body: JSON.stringify(body) });
-export const put = <T = any>(path: string, body: unknown) =>
+export const put = <T = unknown>(path: string, body: unknown) =>
   api<T>(path, { method: 'PUT', body: JSON.stringify(body) });
-export const del = <T = any>(path: string) => api<T>(path, { method: 'DELETE' });
+export const del = <T = unknown>(path: string) => api<T>(path, { method: 'DELETE' });
 
 /**
  * Downloads a protected file. A plain <a href> cannot be used for these: the

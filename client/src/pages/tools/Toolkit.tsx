@@ -7,7 +7,7 @@ import { SeqView } from '../../components/SeqView';
 import { Toggle, CopyButton, download, Empty } from '../../components/ui';
 import {
   parseFasta, cleanSequence, detectKind, classifyInput, reverseComplement, complement, reverse,
-  transcribe, translate, translateAllFrames, findOrfs, gcContent, baseCounts,
+  transcribe, translateAllFrames, findOrfs, gcContent, baseCounts,
   molecularWeight, meltingTemp, meltingTempApplies, formatMass, toFasta
 } from '../../lib/bio/sequence';
 import { HBB_CDS } from '../../lib/bio/samples';
@@ -19,7 +19,7 @@ const NT_COLOR: Record<string, string> = {
 const ONE_DECIMAL = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
 
 export default function Toolkit() {
-  const { t, lang, formatNumber } = useLang();
+  const { t, formatNumber } = useLang();
   const [raw, setRaw] = useState('');
   // Derived views are recomputed from this, not from every keystroke.
   const input = useDebounced(raw);
@@ -30,12 +30,12 @@ export default function Toolkit() {
   // Only the first record is analysed. Joining every record into one string
   // invented sequence that existed in none of them — a reading frame or a
   // restriction site could straddle two unrelated records.
-  const { seq, dropped, id, recordCount, isProtein } = useMemo(() => {
+  const { seq, dropped, ambiguous, id, recordCount, isProtein } = useMemo(() => {
     const records = parseFasta(input);
     const first = records[0];
     const isProtein = first ? classifyInput(first.seq) === 'protein' : false;
-    const cleaned = isProtein ? { seq: '', dropped: 0 } : cleanSequence(first?.seq ?? '');
-    return { seq: cleaned.seq, dropped: cleaned.dropped, id: first?.id ?? 'sequence',
+    const cleaned = isProtein ? { seq: '', dropped: 0, ambiguous: 0 } : cleanSequence(first?.seq ?? '');
+    return { seq: cleaned.seq, dropped: cleaned.dropped, ambiguous: cleaned.ambiguous, id: first?.id ?? 'sequence',
              recordCount: records.length, isProtein };
   }, [input]);
 
@@ -58,6 +58,7 @@ export default function Toolkit() {
               onChange={setRaw}
               onExample={() => setRaw(`>HBB Homo sapiens haemoglobin subunit beta\n${HBB_CDS}`)}
               dropped={dropped}
+              ambiguous={ambiguous}
               records={recordCount}
               firstId={id}
               protein={isProtein}

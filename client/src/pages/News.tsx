@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLang } from '../i18n';
 import { useFetch } from '../lib/useFetch';
-import { PageHeader, Card, Label, Loading, ErrorBox, Empty, DnaStrip } from '../components/ui';
+import { PageHeader, Card, Loading, ErrorBox, Empty, DnaStrip } from '../components/ui';
 
 type Item = {
   id: number; slug: string; date: string; tag: string;
@@ -10,7 +10,7 @@ type Item = {
 };
 
 export default function News() {
-  const { t, f, formatDate } = useLang();
+  const { t, f, formatDate, tv } = useLang();
   const [tag, setTag] = useState('');
   const [open, setOpen] = useState<number | null>(null);
   const news = useFetch<Item[]>('/news');
@@ -25,7 +25,7 @@ export default function News() {
           <button type="button" aria-pressed={!tag} className={`chip ${!tag ? 'chip-on' : ''}`} onClick={() => setTag('')}>{t('common.all')}</button>
           {tags.map(x => (
             <button key={x} type="button" aria-pressed={tag === x} className={`chip ${tag === x ? 'chip-on' : ''}`} onClick={() => setTag(x)}>
-              {t(`news.tag.${x}` as any)}
+              {tv('news.tag', x)}
             </button>
           ))}
         </div>
@@ -40,7 +40,7 @@ export default function News() {
           <Card key={item.id} hover className="p-6 rise" style={{ animationDelay: `${i * 55}ms` }}>
             <div className="flex flex-wrap items-center gap-3">
               <span className="label">{formatDate(item.date)}</span>
-              <span className="chip">{t(`news.tag.${item.tag}` as any)}</span>
+              <span className="chip">{tv('news.tag', item.tag)}</span>
             </div>
             <h2 className="mt-3 text-2xl leading-snug">{f(item, 'title')}</h2>
             <p className="mt-3 text-[14px] leading-relaxed text-ink2">{f(item, 'excerpt')}</p>

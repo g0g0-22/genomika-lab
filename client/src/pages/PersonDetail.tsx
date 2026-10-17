@@ -8,7 +8,7 @@ import { Avatar } from './Team';
 type Person = {
   id: number; slug: string; hue: number; seniority: string; joined_year: number;
   name_mk: string; name_en: string; role_mk: string; role_en: string;
-  bio_mk: string; bio_en: string; interests: string;
+  bio_mk: string; bio_en: string; interests_mk: string; interests_en: string;
   email: string; orcid: string; github: string; accent: string;
   group_slug: string; group_name_mk: string; group_name_en: string;
   publications: { id: number; title: string; authors: string; venue: string; year: number; doi: string; citations: number }[];
@@ -17,7 +17,7 @@ type Person = {
 
 export default function PersonDetail() {
   const { slug } = useParams();
-  const { t, f } = useLang();
+  const { t, f, tv } = useLang();
   const { data, loading, error, reload } = useFetch<Person>(`/people/${slug}`, [slug]);
   useDocumentTitle(data ? f(data, 'name') : null);
 
@@ -32,7 +32,7 @@ export default function PersonDetail() {
       <div className="mb-8"><Crumb to="/team" label={t('team.title')} /></div>
 
       <header className="border-b border-line pb-10 mb-12 flex flex-wrap items-start gap-8">
-        <Avatar person={data as any} size={96} />
+        <Avatar person={data} size={96} />
         <div className="min-w-0 flex-1">
           <h1 className="text-3xl md:text-5xl rise">{f(data, 'name')}</h1>
           <p className="mt-3 text-lg text-muted rise" style={{ animationDelay: '70ms' }}>{f(data, 'role')}</p>
@@ -62,7 +62,7 @@ export default function PersonDetail() {
                 {data.projects.map(project => (
                   <li key={project.id}>
                     <Card className="p-4 flex items-baseline gap-4">
-                      <span className="chip shrink-0">{t(`research.status.${project.status}` as any)}</span>
+                      <span className="chip shrink-0">{tv('research.status', project.status)}</span>
                       <span className="text-[15px] leading-snug">{f(project, 'title')}</span>
                       {project.member_role === 'PI' && <span className="chip chip-on ml-auto shrink-0">PI</span>}
                     </Card>
@@ -100,7 +100,7 @@ export default function PersonDetail() {
           <Card className="p-5">
             <h2 className="label mb-4">{t('team.interests')}</h2>
             <ul className="flex flex-wrap gap-1.5">
-              {data.interests?.split(';').filter(Boolean).map(item => (
+              {f(data, 'interests').split(';').filter(Boolean).map(item => (
                 <li key={item}><span className="chip">{item.trim()}</span></li>
               ))}
             </ul>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLang } from '../i18n';
 import { useFetch } from '../lib/useFetch';
-import { PageHeader, Card, Label, Loading, ErrorBox, Empty, CopyButton } from '../components/ui';
+import { PageHeader, Card, Loading, ErrorBox, Empty, CopyButton } from '../components/ui';
 
 type Dataset = {
   id: number; slug: string; format: string; size_mb: number; license: string;
@@ -56,7 +56,10 @@ export default function Datasets() {
     [query, license]
   );
 
-  const licenses = [...new Set(datasets.data?.map(d => d.license) ?? [])];
+  // The licence chips come from the whole catalogue, not from the filtered
+  // result — otherwise choosing one licence made the others disappear.
+  const catalogue = useFetch<Dataset[]>('/datasets');
+  const licenses = [...new Set(catalogue.data?.map(d => d.license) ?? [])];
 
   return (
     <>

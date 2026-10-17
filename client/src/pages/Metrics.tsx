@@ -20,7 +20,7 @@ const STAT_KEYS = [
 ] as const;
 
 export default function Metrics() {
-  const { t, f, s, formatNumber, formatDate } = useLang();
+  const { t, f, s, formatNumber, formatDate, tv } = useLang();
   const metrics = useFetch<Metrics>('/metrics');
   const network = useFetch<{ nodes: GraphNode[]; links: GraphLink[] }>('/network');
 
@@ -43,7 +43,7 @@ export default function Metrics() {
               value={key === 'active_funding'
                 ? `€${formatNumber(Math.round((data.totals[key] ?? 0) / 1000))}k`
                 : formatNumber(data.totals[key] ?? 0)}
-              label={t(`met.stat.${key}` as any)}
+              label={tv('met.stat', key)}
             />
           </div>
         ))}

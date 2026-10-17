@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api } from './api';
+import { api, fetchAllPages } from './api';
 
 /** Minimal data-fetching hook: enough for this site, nothing more. */
 export function useFetch<T>(path: string | null, deps: unknown[] = []) {
@@ -23,4 +23,23 @@ export function useFetch<T>(path: string | null, deps: unknown[] = []) {
   }, [path, nonce, ...deps]);
 
   return { data, loading, error, reload };
+}
+
+/** Like useFetch, for a paged listing whose every page is wanted. */
+export function useAllPages<T>(path: string | null, deps: unknown[] = []) {
+  const [data, setData] = useState<T[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!path) return;
+    let cancelled = false;
+    setError(null);
+    fetchAllPages<T>(path)
+      .then(items => { if (!cancelled) setData(items); })
+      .catch(e => { if (!cancelled) setError(e.code ?? 'error'); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, ...deps]);
+
+  return { data, error };
 }

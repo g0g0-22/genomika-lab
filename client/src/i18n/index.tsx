@@ -8,8 +8,14 @@ type Ctx = {
   setLang: (l: Lang) => void;
   toggle: () => void;
   t: (key: DictKey) => string;
+  /**
+   * The label for a value that comes from data — a status, a tag, a type:
+   * tv('news.tag', item.tag). A value with no entry shows as itself rather
+   * than as a raw dictionary key.
+   */
+  tv: (prefix: string, value: string | null | undefined) => string;
   /** Picks the *_mk / *_en variant off an API row. */
-  f: <T extends Record<string, any>>(row: T | null | undefined, base: string) => string;
+  f: (row: object | null | undefined, base: string) => string;
   /** Picks one side of a single "Македонски / English" string. */
   s: (value: string | null | undefined) => string;
   formatDate: (iso: string, opts?: Intl.DateTimeFormatOptions) => string;
@@ -67,7 +73,15 @@ export function LangProvider({ children }: { children: ReactNode }) {
       setLang,
       toggle,
       t: (key) => (dict[key]?.[idx] ?? key) as string,
-      f: (row, base) => (row ? (row[`${base}_${lang}`] ?? row[`${base}_en`] ?? '') : ''),
+      tv: (prefix, value) => {
+        const entry = (dict as Record<string, readonly [string, string]>)[`${prefix}.${value}`];
+        return entry ? entry[idx] : String(value ?? '');
+      },
+      f: (row, base) => {
+        if (!row) return '';
+        const fields = row as Record<string, unknown>;
+        return String(fields[`${base}_${lang}`] ?? fields[`${base}_en`] ?? '');
+      },
       s: (value) => {
         if (!value) return '';
         const parts = value.split(' / ');

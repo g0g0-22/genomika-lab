@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,18 +15,36 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR
   || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'uploads');
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const MAX_CV_BYTES = 4 * 1024 * 1024;
-const ALLOWED_CV = ['application/pdf', 'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+/*
+ * The accepted formats. A file must agree with itself on all three counts:
+ * its extension picks the format, its declared type must be that format's,
+ * and its bytes must look like that format. A leading-bytes check alone
+ * accepted page.html starting with %PDF, and any zip renamed to .docx.
+ *
+ * This is still not a parser — a well-formed document can carry a macro — so
+ * the file is also stored under a random name with the extension we chose,
+ * and only ever handed back as a download.
+ */
+const startsWith = (buffer, bytes) => bytes.every((byte, i) => buffer[i] === byte);
+const CV_FORMATS = {
+  pdf: {
+    type: 'application/pdf',
+    looksRight: (b) => b.subarray(0, 5).toString('latin1') === '%PDF-'
+  },
+  docx: {
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    // A zip whose directory names the Word main part.
+    looksRight: (b) => startsWith(b, [0x50, 0x4B, 0x03, 0x04]) && b.includes('word/document.xml')
+  },
+  doc: {
+    type: 'application/msword',
+    looksRight: (b) => startsWith(b, [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1])  // OLE2 container
+  }
+};
 
-/** Leading bytes of the formats we accept — a declared MIME type proves nothing. */
-const CV_SIGNATURES = [
-  [0x25, 0x50, 0x44, 0x46],                         // %PDF
-  [0x50, 0x4B, 0x03, 0x04],                         // PK.. — DOCX (a zip)
-  [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]  // legacy .doc
-];
-
-const looksLikeAllowedDocument = (buffer) =>
-  CV_SIGNATURES.some(sig => sig.every((byte, i) => buffer[i] === byte));
+/** The name the applicant gave, reduced to something safe to show and to offer as a filename. */
+const displayName = (name) =>
+  String(name || 'cv').split(/[\\/]/).pop().replace(/[^\p{L}\p{N}._ -]+/gu, '_').slice(-120) || 'cv';
 
 careers.get('/positions', (req, res) => {
   const open = req.query.open;
@@ -35,13 +54,6 @@ careers.get('/positions', (req, res) => {
   const rows = db.prepare(`${sql} ORDER BY p.is_open DESC, p.deadline`).all()
     .map(p => ({ ...p, is_open: p.is_open && p.deadline >= today ? 1 : 0 }));
   res.json(open === 'true' ? rows.filter(p => p.is_open) : rows);
-});
-
-careers.get('/positions/:slug', (req, res) => {
-  const row = db.prepare(`SELECT p.*, g.slug AS group_slug, g.name_mk AS group_name_mk, g.name_en AS group_name_en, g.accent
-                          FROM positions p LEFT JOIN groups g ON g.id = p.group_id WHERE p.slug = ?`).get(req.params.slug);
-  if (!row) return res.status(404).json({ error: 'not_found' });
-  res.json(row);
 });
 
 careers.post('/positions/:slug/apply', publicWrites, (req, res) => {
@@ -66,11 +78,11 @@ careers.post('/positions/:slug/apply', publicWrites, (req, res) => {
    * validating afterwards let an unauthenticated caller leave orphaned files
    * on the volume by failing a different field on purpose.
    *
-   * The declared MIME type is attacker-supplied, so it is checked
-   * unconditionally AND corroborated against the file's leading bytes.
+   * The declared type and the name are attacker-supplied, so neither is
+   * trusted on its own: see CV_FORMATS.
    */
   const cv = req.body?.cv;
-  let cvFilename = null, cvSize = null, cvBuffer = null;
+  let cvFilename = null, cvOriginal = null, cvSize = null, cvBuffer = null;
 
   if (cv?.data) {
     let buffer;
@@ -80,13 +92,15 @@ careers.post('/positions/:slug/apply', publicWrites, (req, res) => {
       buffer = Buffer.alloc(0);
     }
 
+    const extension = String(cv.name || '').toLowerCase().match(/\.([a-z]+)$/)?.[1];
+    const format = Object.hasOwn(CV_FORMATS, extension ?? '') ? CV_FORMATS[extension] : null;
+
     if (buffer.length === 0) errors.cv = 'unreadable';
     else if (buffer.length > MAX_CV_BYTES) errors.cv = 'too_large';
-    else if (!ALLOWED_CV.includes(String(cv.type || ''))) errors.cv = 'unsupported_type';
-    else if (!looksLikeAllowedDocument(buffer)) errors.cv = 'unsupported_type';
+    else if (!format || cv.type !== format.type || !format.looksRight(buffer)) errors.cv = 'unsupported_type';
     else {
-      const safe = String(cv.name || 'cv.pdf').replace(/[^\w.\-]+/g, '_').slice(-80);
-      cvFilename = `${Date.now()}-${safe}`;
+      cvFilename = `${randomUUID()}.${extension}`;
+      cvOriginal = displayName(cv.name);
       cvSize = buffer.length;
       cvBuffer = buffer;
     }
@@ -100,8 +114,8 @@ careers.post('/positions/:slug/apply', publicWrites, (req, res) => {
   }
 
   const info = db.prepare(
-    'INSERT INTO applications (position_id,name,email,motivation,cv_filename,cv_size) VALUES (?,?,?,?,?,?)'
-  ).run(position.id, name, email, motivation, cvFilename, cvSize);
+    'INSERT INTO applications (position_id,name,email,motivation,cv_filename,cv_original_name,cv_size) VALUES (?,?,?,?,?,?,?)'
+  ).run(position.id, name, email, motivation, cvFilename, cvOriginal, cvSize);
 
   res.status(201).json({ ok: true, reference: `GL-${String(info.lastInsertRowid).padStart(5, '0')}` });
 });

@@ -1,11 +1,13 @@
 import bcrypt from 'bcryptjs';
 import { db, migrate } from './db.js';
 import { localDate } from './lib/dates.js';
+import { linkAuthors } from './lib/authors.js';
+import { DEMO_ACCOUNTS, seedPassword } from './lib/demo.js';
 
 migrate();
 
 const wipe = [
-  'publication_authors','project_members','rsvps','bookings','applications',
+  'instrument_training','publication_authors','project_members','rsvps','bookings','applications',
   'messages','partners','positions','events','news','datasets','publications',
   'projects','people','groups','instruments','users'
 ];
@@ -55,110 +57,110 @@ const peopleRows = [
   { slug:'ana-trajkovska', name_mk:'проф. д-р Ана Трајковска', name_en:'Prof. Ana Trajkovska',
     role_mk:'Директорка на лабораторијата', role_en:'Laboratory Director', seniority:'faculty',
     group_id:G['comparative-genomics'], email:'a.trajkovska@genomika.mk', orcid:'', github:'',
-    interests:'филогеномика;структурни варијанти;алгоритми за порамнување', joined_year:2016, hue:96,
+    interests_mk:'филогеномика;структурни варијанти;алгоритми за порамнување', interests_en:'phylogenomics;structural variants;alignment algorithms', joined_year:2016, hue:96,
     bio_mk: 'Ана ја основала лабораторијата во 2016 година, по десет години работа во Европскиот институт за биоинформатика. Ја интересира како изборот на алгоритам влијае врз биолошките заклучоци — тема за која предава и на додипломски студии.',
     bio_en:'Ana founded the laboratory in 2016 after ten years at the European Bioinformatics Institute. Her interest is how algorithmic choice shapes biological conclusions — a topic she also teaches at undergraduate level.' },
   { slug:'marko-stefanovski', name_mk:'д-р Марко Стефановски', name_en:'Dr. Marko Stefanovski',
     role_mk:'Раководител на група', role_en:'Group Leader', seniority:'faculty',
     group_id:G['comparative-genomics'], email:'m.stefanovski@genomika.mk', orcid:'', github:'',
-    interests:'структурни варијанти;long-read секвенционирање;графови на геноми', joined_year:2017, hue:86,
+    interests_mk:'структурни варијанти;секвенционирање со долги отчитувања;графови на геноми', interests_en:'structural variants;long-read sequencing;genome graphs', joined_year:2017, hue:86,
     bio_mk: 'Марко работи на пангеномски графови и откривање структурни варијанти со помош на долги отчитувања. Пред да се приклучи на лабораторијата, работел во областа на клиничката геномика во Загреб.',
     bio_en:'Marko works on pangenome graphs and structural-variant detection from long reads. Before joining he worked in clinical genomics in Zagreb.' },
   { slug:'elena-risteska', name_mk:'д-р Елена Ристеска', name_en:'Dr. Elena Risteska',
     role_mk:'Раководителка на група', role_en:'Group Leader', seniority:'faculty',
     group_id:G['structural-bioinformatics'], email:'e.risteska@genomika.mk', orcid:'', github:'',
-    interests:'предвидување структура;молекуларна динамика;дизајн на протеини', joined_year:2018, hue:176,
+    interests_mk:'предвидување структура;молекуларна динамика;дизајн на протеини', interests_en:'structure prediction;molecular dynamics;protein design', joined_year:2018, hue:176,
     bio_mk: 'Елена ја води групата за структурна биоинформатика. Работи на методи за процена на термостабилноста на инженерски модифицирани ензими без потреба од скапи симулации.',
     bio_en:'Elena leads the structural bioinformatics group. She works on methods that assess the thermostability of engineered enzymes without requiring expensive simulations.' },
   { slug:'damjan-kovachevikj', name_mk:'д-р Дамјан Ковачевиќ', name_en:'Dr. Damjan Kovachevikj',
     role_mk:'Раководител на група', role_en:'Group Leader', seniority:'faculty',
     group_id:G['microbiome-ml'], email:'d.kovachevikj@genomika.mk', orcid:'', github:'',
-    interests:'метагеномика;репрезентациско учење;еколошка статистика', joined_year:2021, hue:38,
+    interests_mk:'метагеномика;репрезентациско учење;еколошка статистика', interests_en:'metagenomics;representation learning;ecological statistics', joined_year:2021, hue:38,
     bio_mk: 'Дамјан ја поврзува микробната екологија со современото машинско учење. Тој го координира долгорочното следење на микробиомот на Охридското Езеро.',
     bio_en:'Damjan connects microbial ecology with modern machine learning. He coordinates the long-term monitoring of the Lake Ohrid microbiome.' },
   { slug:'ivana-petrushevska', name_mk:'д-р Ивана Петрушевска', name_en:'Dr. Ivana Petrushevska',
     role_mk:'Постдокторска истражувачка', role_en:'Postdoctoral Researcher', seniority:'postdoc',
     group_id:G['structural-bioinformatics'], email:'i.petrushevska@genomika.mk', orcid:'', github:'',
-    interests:'места за врзување;графовски невронски мрежи', joined_year:2022, hue:165,
+    interests_mk:'места за врзување;графовски невронски мрежи', interests_en:'binding sites;graph neural networks', joined_year:2022, hue:165,
     bio_mk: 'Ивана развива графовски невронски мрежи што ги предвидуваат активните места во ензимите на екстремофилните организми.',
     bio_en:'Ivana develops graph neural networks that predict active sites in enzymes from extremophile organisms.' },
   { slug:'nikola-avramovski', name_mk:'Никола Аврамовски', name_en:'Nikola Avramovski',
     role_mk:'Докторанд', role_en:'PhD Candidate', seniority:'phd',
     group_id:G['comparative-genomics'], email:'n.avramovski@genomika.mk', orcid:'', github:'',
-    interests:'порамнување на секвенци;SIMD оптимизација', joined_year:2022, hue:104,
+    interests_mk:'порамнување на секвенци;SIMD оптимизација', interests_en:'sequence alignment;SIMD optimisation', joined_year:2022, hue:104,
     bio_mk: 'Никола работи на векторизирани имплементации на алгоритмот Smith–Waterman што се извршуваат директно во веб-прелистувач.',
     bio_en:'Nikola works on vectorised Smith–Waterman implementations that run directly inside a web browser.' },
   { slug:'sara-jovanoska', name_mk:'Сара Јованоска', name_en:'Sara Jovanoska',
     role_mk:'Докторандка', role_en:'PhD Candidate', seniority:'phd',
     group_id:G['microbiome-ml'], email:'s.jovanoska@genomika.mk', orcid:'', github:'',
-    interests:'16S rRNA;диверзитет;биостатистика', joined_year:2023, hue:44,
+    interests_mk:'16S rRNA;диверзитет;биостатистика', interests_en:'16S rRNA;diversity;biostatistics', joined_year:2023, hue:44,
     bio_mk: 'Сара ги анализира сезонските промени во микробните заедници и развива робусни мерки за разновидност кај мал број примероци.',
     bio_en:'Sara analyses seasonal shifts in microbial communities and works on robust diversity measures for small samples.' },
   { slug:'filip-micevski', name_mk:'Филип Мицевски', name_en:'Filip Micevski',
     role_mk:'Инженер за истражувачки софтвер', role_en:'Research Software Engineer', seniority:'staff',
     group_id:G['comparative-genomics'], email:'f.micevski@genomika.mk', orcid:'', github:'',
-    interests:'веб-платформи;репродуцибилност;CI за наука', joined_year:2019, hue:120,
+    interests_mk:'веб-платформи;репродуцибилност;CI за наука', interests_en:'web platforms;reproducibility;CI for science', joined_year:2019, hue:120,
     bio_mk: 'Филип ги одржува сите алатки на оваа веб-страница. Верува дека истражувачки метод навистина постои само кога и други можат да го применат.',
     bio_en:'Filip maintains every tool you see on this site. He believes a research method does not exist until somebody else can run it.' },
   { slug:'tamara-gjorgjievska', name_mk:'Тамара Ѓорѓиевска', name_en:'Tamara Gjorgjievska',
     role_mk:'Управничка со податоци', role_en:'Data Steward', seniority:'staff',
     group_id:G['microbiome-ml'], email:'t.gjorgjievska@genomika.mk', orcid:'', github:'',
-    interests:'FAIR принципи;метаподатоци;архивирање', joined_year:2021, hue:30,
+    interests_mk:'FAIR принципи;метаподатоци;архивирање', interests_en:'FAIR principles;metadata;archiving', joined_year:2021, hue:30,
     bio_mk: 'Тамара се грижи податочните множества на лабораторијата да можат лесно да се пронајдат, да бидат достапни и повторно да се користат.',
     bio_en:'Tamara makes sure the laboratory datasets stay findable, accessible and reusable.' },
   { slug:'bojan-naumovski', name_mk:'Бојан Наумовски', name_en:'Bojan Naumovski',
     role_mk:'Магистрант', role_en:'MSc Student', seniority:'msc',
     group_id:G['structural-bioinformatics'], email:'b.naumovski@genomika.mk', orcid:'', github:'',
-    interests:'визуелизација на протеини;WebGL', joined_year:2024, hue:186,
+    interests_mk:'визуелизација на протеини;WebGL', interests_en:'protein visualisation;WebGL', joined_year:2024, hue:186,
     bio_mk: 'Бојан ја пишува магистерската теза за интерактивна визуелизација на конформациски ансамбли.',
     bio_en:'Bojan is writing his MSc thesis on interactive visualisation of conformational ensembles.' }
 ];
-const pStmt = ins(`INSERT INTO people (slug,name_mk,name_en,role_mk,role_en,seniority,group_id,email,orcid,github,bio_mk,bio_en,interests,joined_year,hue)
-  VALUES (@slug,@name_mk,@name_en,@role_mk,@role_en,@seniority,@group_id,@email,@orcid,@github,@bio_mk,@bio_en,@interests,@joined_year,@hue)`);
+const pStmt = ins(`INSERT INTO people (slug,name_mk,name_en,role_mk,role_en,seniority,group_id,email,orcid,github,bio_mk,bio_en,interests_mk,interests_en,joined_year,hue)
+  VALUES (@slug,@name_mk,@name_en,@role_mk,@role_en,@seniority,@group_id,@email,@orcid,@github,@bio_mk,@bio_en,@interests_mk,@interests_en,@joined_year,@hue)`);
 peopleRows.forEach(p => pStmt.run(p));
 const P = Object.fromEntries(db.prepare('SELECT slug,id FROM people').all().map(r => [r.slug, r.id]));
 
 /* -------------------------------------------------------------- PROJECTS */
 const projectRows = [
-  { slug:'balkan-pangenome', group_id:G['comparative-genomics'], status:'active', funder:'Horizon Europe', grant_code:'HE-101089442', budget_eur:840000, start_date:'2024-01-01', end_date:'2027-12-31',
+  { slug:'balkan-pangenome', group_id:G['comparative-genomics'], funder:'Horizon Europe', grant_code:'HE-101089442', budget_eur:840000, start_date:'2024-01-01', end_date:'2027-12-31',
     title_mk:'Балкански пангеном на ендемични видови',
     title_en:'Balkan Pangenome of Endemic Species',
     abstract_mk: 'Градиме графовски пангеном врз основа на 120 ендемични видови од Балканскиот Полуостров за да ги откриеме структурните варијанти што им овозможуваат да се приспособат на изолирани живеалишта.',
     abstract_en:'We are building a graph pangenome from 120 endemic species of the Balkan Peninsula in order to reveal the structural variants that enable their adaptation to isolated habitats.',
     members:['ana-trajkovska','marko-stefanovski','nikola-avramovski','filip-micevski'] },
-  { slug:'ohrid-microbiome', group_id:G['microbiome-ml'], status:'active', funder:'Фонд за иновации / Innovation Fund', grant_code:'IF-2023-114', budget_eur:310000, start_date:'2023-06-01', end_date:'2026-05-31',
+  { slug:'ohrid-microbiome', group_id:G['microbiome-ml'], funder:'Фонд за иновации / Innovation Fund', grant_code:'IF-2023-114', budget_eur:310000, start_date:'2023-06-01', end_date:'2026-05-31',
     title_mk: 'Долгорочно следење на микробиомот на Охридското Езеро',
     title_en:'Long-term Monitoring of the Lake Ohrid Microbiome',
     abstract_mk: 'Секој месец земаме примероци од дванаесет точки на различни длабочини во езерото и ги следиме промените во микробните заедници со помош на метагеномско секвенционирање.',
     abstract_en:'Every month we sample twelve depth points across the lake and follow shifts in microbial communities using metagenomic sequencing.',
     members:['damjan-kovachevikj','sara-jovanoska','tamara-gjorgjievska'] },
-  { slug:'thermostable-enzymes', group_id:G['structural-bioinformatics'], status:'active', funder:'МОН / Ministry of Education', grant_code:'MON-BIO-09', budget_eur:190000, start_date:'2024-09-01', end_date:'2027-08-31',
+  { slug:'thermostable-enzymes', group_id:G['structural-bioinformatics'], funder:'МОН / Ministry of Education', grant_code:'MON-BIO-09', budget_eur:190000, start_date:'2024-09-01', end_date:'2027-08-31',
     title_mk:'Пресметковен дизајн на термостабилни ензими',
     title_en:'Computational Design of Thermostable Enzymes',
     abstract_mk: 'Развиваме брз модел што ја предвидува промената на слободната енергија при точкести мутации кај индустриски ензими што функционираат на температури над 70 °C.',
     abstract_en:'We are developing a fast model predicting the free-energy change of point mutations for industrial enzymes operating above 70 °C.',
     members:['elena-risteska','ivana-petrushevska','bojan-naumovski'] },
-  { slug:'webalign', group_id:G['comparative-genomics'], status:'active', funder:'Chan Zuckerberg Initiative EOSS', grant_code:'CZI-EOSS-6-0233', budget_eur:120000, start_date:'2025-01-01', end_date:'2026-12-31',
+  { slug:'webalign', group_id:G['comparative-genomics'], funder:'Chan Zuckerberg Initiative EOSS', grant_code:'CZI-EOSS-6-0233', budget_eur:120000, start_date:'2025-01-01', end_date:'2026-12-31',
     title_mk: 'WebAlign: порамнување на секвенци во прелистувач',
     title_en:'WebAlign: Alignment in the Browser',
     abstract_mk: 'Отворена библиотека што им овозможува на студентите и наставниците да користат класични алгоритми за порамнување без инсталација и без сервер.',
     abstract_en:'An open library that lets students and teachers run classical alignment algorithms with no installation and no server.',
     members:['nikola-avramovski','filip-micevski','ana-trajkovska'] },
-  { slug:'shar-soil', group_id:G['microbiome-ml'], status:'completed', funder:'DAAD', grant_code:'DAAD-57598', budget_eur:74000, start_date:'2021-10-01', end_date:'2024-09-30',
+  { slug:'shar-soil', group_id:G['microbiome-ml'], funder:'DAAD', grant_code:'DAAD-57598', budget_eur:74000, start_date:'2021-10-01', end_date:'2024-09-30',
     title_mk: 'Микробна разновидност во почвите на Шар Планина',
     title_en:'Microbial Diversity of Šar Mountain Soils',
     abstract_mk: 'Тригодишно истражување по висински трансект што ги мапира промените во микробната разновидност од 900 до 2.500 метри надморска височина.',
     abstract_en:'A three-year altitudinal transect mapping the change of microbial diversity from 900 to 2500 metres.',
     members:['damjan-kovachevikj','sara-jovanoska'] },
-  { slug:'openbio-edu', group_id:G['structural-bioinformatics'], status:'planned', funder:'Erasmus+', grant_code:'ERA-2026-KA220', budget_eur:250000, start_date:'2026-03-01', end_date:'2029-02-28',
+  { slug:'openbio-edu', group_id:G['structural-bioinformatics'], funder:'Erasmus+', grant_code:'ERA-2026-KA220', budget_eur:250000, start_date:'2026-03-01', end_date:'2029-02-28',
     title_mk:'OpenBio-EDU: отворени наставни ресурси за биоинформатика',
     title_en:'OpenBio-EDU: Open Teaching Resources for Bioinformatics',
     abstract_mk: 'Конзорциум од пет универзитети што подготвува двојазични интерактивни наставни материјали за додипломски курсеви по биоинформатика.',
     abstract_en:'A five-university consortium building bilingual interactive teaching material for undergraduate bioinformatics courses.',
     members:['elena-risteska','filip-micevski','ana-trajkovska','bojan-naumovski'] }
 ];
-const prStmt = ins(`INSERT INTO projects (slug,title_mk,title_en,abstract_mk,abstract_en,group_id,status,funder,grant_code,budget_eur,start_date,end_date)
-  VALUES (@slug,@title_mk,@title_en,@abstract_mk,@abstract_en,@group_id,@status,@funder,@grant_code,@budget_eur,@start_date,@end_date)`);
+const prStmt = ins(`INSERT INTO projects (slug,title_mk,title_en,abstract_mk,abstract_en,group_id,funder,grant_code,budget_eur,start_date,end_date)
+  VALUES (@slug,@title_mk,@title_en,@abstract_mk,@abstract_en,@group_id,@funder,@grant_code,@budget_eur,@start_date,@end_date)`);
 const pmStmt = ins('INSERT INTO project_members (project_id, person_id, role) VALUES (?,?,?)');
 projectRows.forEach(p => {
   const { members, ...row } = p;
@@ -198,21 +200,11 @@ const pubs = [
 ];
 const pubStmt = ins(`INSERT INTO publications (title,authors,venue,year,type,doi,citations,open_access,group_id,keywords,abstract)
   VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
-const paStmt = ins('INSERT INTO publication_authors (publication_id, person_id, position) VALUES (?,?,?)');
-const nameToSlug = {
-  'Trajkovska A':'ana-trajkovska','Stefanovski M':'marko-stefanovski','Risteska E':'elena-risteska',
-  'Kovachevikj D':'damjan-kovachevikj','Petrushevska I':'ivana-petrushevska','Avramovski N':'nikola-avramovski',
-  'Jovanoska S':'sara-jovanoska','Micevski F':'filip-micevski','Gjorgjievska T':'tamara-gjorgjievska',
-  'Naumovski B':'bojan-naumovski'
-};
 pubs.forEach(p => {
   const [title,authors,venue,year,type,doi,citations,oa,gslug,keywords] = p;
   const abstract = `${title}. Published in ${venue} (${year}). This record is part of the demonstration corpus of GenomikaLab and is provided for interface evaluation purposes.`;
   const { lastInsertRowid } = pubStmt.run(title,authors,venue,year,type,doi,citations,oa,G[gslug],keywords,abstract);
-  authors.split(', ').forEach((a, i) => {
-    const slug = nameToSlug[a.trim()];
-    if (slug) paStmt.run(lastInsertRowid, P[slug], i);
-  });
+  linkAuthors(lastInsertRowid, authors);
 });
 
 /* -------------------------------------------------------------- DATASETS */
@@ -246,7 +238,7 @@ const datasets = [
     title_mk:'Наставна збирка секвенци', title_en:'Teaching sequence collection',
     description_mk: 'Мала, внимателно одбрана збирка од 240 нуклеотидни и протеински секвенци, избрани за настава по класичните алгоритми за анализа на секвенци.',
     description_en:'A small curated collection of 240 nucleotide and protein sequences chosen for teaching the classical sequence-analysis algorithms.',
-    preview_csv:'accession,type,length,description,difficulty\nEDU-001,DNA,240,Lambda phage fragment with EcoRI sites,easy\nEDU-002,DNA,1044,Human beta-globin coding region,easy\nEDU-003,PROT,141,Human haemoglobin alpha chain,easy\nEDU-004,DNA,3120,Repeat-rich plant intron,hard\nEDU-005,PROT,398,Thermophilic glycoside hydrolase,medium' }
+    preview_csv:'accession,type,length,description,difficulty\nEDU-001,DNA,240,Lambda phage fragment with EcoRI sites,easy\nEDU-002,DNA,444,Human beta-globin coding region,easy\nEDU-003,PROT,141,Human haemoglobin alpha chain,easy\nEDU-004,DNA,3120,Repeat-rich plant intron,hard\nEDU-005,PROT,398,Thermophilic glycoside hydrolase,medium' }
 ];
 const dStmt = ins(`INSERT INTO datasets (slug,title_mk,title_en,description_mk,description_en,format,size_mb,license,year,downloads,doi,organism,rows_count,preview_csv)
   VALUES (@slug,@title_mk,@title_en,@description_mk,@description_en,@format,@size_mb,@license,@year,@downloads,@doi,@organism,@rows_count,@preview_csv)`);
@@ -454,14 +446,31 @@ const partStmt = ins('INSERT INTO partners (name,city,country,lat,lng,joint_pape
 partners.forEach(p => partStmt.run(...p));
 
 /* ----------------------------------------------------------------- USERS */
-const users = [
-  ['admin@genomika.mk','genomika2026','admin','ana-trajkovska'],
-  ['f.micevski@genomika.mk','genomika2026','admin','filip-micevski'],
-  ['n.avramovski@genomika.mk','genomika2026','researcher','nikola-avramovski'],
-  ['s.jovanoska@genomika.mk','genomika2026','researcher','sara-jovanoska']
-];
+// Passwords per role come from lib/demo.js: configured, or generated and shown once here.
 const uStmt = ins('INSERT INTO users (email,password_hash,role,person_id) VALUES (?,?,?,?)');
-users.forEach(([email, pw, role, slug]) => uStmt.run(email, bcrypt.hashSync(pw, 10), role, P[slug] ?? null));
+const passwords = { admin: seedPassword('admin'), researcher: seedPassword('researcher') };
+DEMO_ACCOUNTS.forEach(({ email, role, person }) =>
+  uStmt.run(email, bcrypt.hashSync(passwords[role], 10), role, P[person] ?? null));
+for (const [role, variable] of [['admin', 'ADMIN_PASSWORD'], ['researcher', 'DEMO_PASSWORD']]) {
+  if (!process.env[variable] && process.env.NODE_ENV === 'production') {
+    console.log(`  ${role} accounts: generated password ${passwords[role]}  (set ${variable} to choose one)`);
+  }
+}
+
+/* ------------------------------------------------------------- TRAINING */
+// Instruments flagged requires_training can be booked only by people trained
+// on them. Nikola is trained on the nanopore sequencer alone, so the other two
+// sequencing and QC instruments show the refusal when he signs in.
+const tStmt = ins('INSERT INTO instrument_training (user_id, instrument_id) VALUES (?, ?)');
+[
+  ['admin@genomika.mk',        ['nanopore-promethion', 'illumina-nextseq', 'bioanalyzer']],
+  ['f.micevski@genomika.mk',   ['nanopore-promethion', 'illumina-nextseq', 'bioanalyzer']],
+  ['n.avramovski@genomika.mk', ['nanopore-promethion']],
+  ['s.jovanoska@genomika.mk',  ['nanopore-promethion', 'bioanalyzer']]
+].forEach(([email, slugs]) => {
+  const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+  slugs.forEach(slug => tStmt.run(user.id, I[slug]));
+});
 
 /* -------------------------------------------------------- SAMPLE BOOKINGS */
 const today = new Date();

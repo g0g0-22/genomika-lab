@@ -20,14 +20,14 @@ The project is deliberately not a plain landing page. It is built as what real b
 | | Функционалност | Feature |
 |---|---|---|
 | 🧬 | Две алатки за анализа на секвенци што работат локално во прелистувач | Two sequence-analysis tools running locally in the browser |
-| 📅 | Систем за резервација на инструменти со детекција на преклопување | Instrument booking system with overlap detection |
+| 📅 | Резервација на инструменти: преклопувања, работно време, квоти и задолжителна обука | Instrument booking: overlaps, opening hours, quotas and required training |
 | 🔐 | Автентикација со JWT и улоги (`admin`, `researcher`) | JWT authentication with roles |
 | 🗂️ | Администрација со CRUD за публикации, вести и луѓе | Administration with CRUD for publications, news and people |
 | 🔎 | Пребарлив каталог на публикации со извоз во BibTeX | Searchable publication catalogue with BibTeX export |
 | 📊 | Репозиториум на податоци со преглед и преземање CSV | Dataset repository with preview and CSV download |
 | 📈 | Контролна табла со метрики, Gantt и мрежа на соработка | Metrics dashboard with a Gantt chart and collaboration network |
 | ✉️ | Пријави за настани (+ `.ics`), за позиции (+ прикачување CV) и контакт форма | Event RSVPs (+ `.ics`), job applications (+ CV upload) and a contact form |
-| 🌍 | Целосна двојазичност МК/EN и светла/темна тема | Full MK/EN bilingualism and light/dark themes |
+| 🌍 | Двојазичен интерфејс и содржина МК/EN (публикациите се на јазикот на кој се објавени) и светла/темна тема | Bilingual MK/EN interface and content (publications in the language they were published in) and light/dark themes |
 
 ---
 
@@ -68,18 +68,22 @@ npm run lint              # ESLint, вклучително правилата з
 npm run check:contrast    # контраст и далтонизам за секоја боја во двете теми
 ```
 
-**83 теста** во две нивоа / **83 tests** at two levels:
+**93 теста** во две нивоа / **93 tests** at two levels:
 
-* **32** (`client/tests/bio.test.ts`) ја покриваат алгоритамската библиотека и
-  BibTeX извозот — FASTA, транслација, ORF, Tm, молекуларна маса, рестрикциска
-  дигестија на линеарна и кружна ДНК — со очекувани вредности што доаѓаат од
-  биологијата, не од кодот. / cover the algorithm library and the BibTeX export,
-  with expected values taken from the biology rather than from the code.
-* **51** (`server/tests/api.test.js`) го возат вистинскиот HTTP слој врз
-  привремена база: автентикација и улоги, ограничување на обиди, преклопување и
-  квоти на резервации, валидација на датуми и прикачени датотеки, приватност,
-  пребарување и администрација. Ништо не е мокирано. / drive the real HTTP layer
-  against a throwaway database. Nothing is mocked.
+* **35** (`client/tests/bio.test.ts`) ја покриваат алгоритамската библиотека и
+  BibTeX извозот — FASTA, двосмислени бази, транслација, ORF, Tm, молекуларна
+  маса, рестрикциска дигестија на линеарна и кружна ДНК, краеви на сечење.
+  Очекуваните вредности не се преземени од излезот на кодот: тоа се објавени
+  факти (β-глобин, OligoCalc) или се изведени со друг, намерно наивен метод
+  (пребарување на низа плус поместување на сечењето). / cover the algorithm
+  library and the BibTeX export. Expected values are published facts or are
+  derived by a separate, deliberately naive method — never read off the code.
+* **58** (`server/tests/api.test.js`) го возат вистинскиот HTTP слој врз
+  привремена база: автентикација и улоги, ограничување на обиди (и дека
+  фалсификуван `X-Forwarded-For` не помага), резервации, обука, квоти,
+  валидација на датуми и прикачени датотеки, поврзување автори, приватност,
+  пребарување и администрација. Ништо не е мокирано. / drive the real HTTP
+  layer against a throwaway database. Nothing is mocked.
 
 ```bash
 npm run test:client     # алгоритми / algorithms
@@ -90,29 +94,42 @@ BASE_URL=http://localhost:8080 npm run smoke
 ```
 
 `scripts/smoke.mjs` проверува над 120 работи врз вистинската распоредба — секоја
-функционалност од овој документ барем еднаш, вклучително и заглавјата за
-кеширање, компресија и безбедност што ги поставува nginx. Може да се изврши
-повеќе пати врз ист стек, но пишува демо-записи, па никогаш врз стек со вистински
-податоци. / Checks over 120 things against the real deployment — every feature
-in this document at least once, including the caching, compression and security
-headers nginx sets. It can be re-run against the same stack, but it writes demo
-records, so never run it against one holding real data.
+функционалност од овој документ барем еднаш, вклучително и заглавјата што ги
+поставува nginx. Последниот дел намерно ги троши ограничувањата за најава и форми
+на клиентот што го извршува, за да докаже дека постојат; повторно извршување
+пред да истечат (една, односно десет минути) запира со јасна порака. Пишува
+демо-записи, па никогаш врз стек со вистински податоци. / Checks over 120 things
+against the real deployment. Its last section deliberately uses up the running
+client's sign-in and form allowances to prove the limits exist, so a re-run
+within ten minutes stops with a clear message. It writes demo records, so never
+run it against a stack holding real data.
 
 ---
 
 ## Демо сметки / Demo accounts
 
-| Улога / Role | Е-пошта / Email | Лозинка / Password |
-|---|---|---|
-| Администратор / Administrator | `admin@genomika.mk` | `genomika2026` |
-| Истражувач / Researcher | `n.avramovski@genomika.mk` | `genomika2026` |
+Seed-от создава четири сметки: две администраторски (`admin@genomika.mk`,
+`f.micevski@genomika.mk`) и две истражувачки (`n.avramovski@genomika.mk`,
+`s.jovanoska@genomika.mk`). Лозинките ги избира деплојментот, одделно за двете
+улоги, а одделно и што нуди страницата за најава:
 
-Seed-от создава четири сметки, од кои **две** се администратори
-(`admin@genomika.mk` и `f.micevski@genomika.mk`). / The seed creates four
-accounts, **two** of which are administrators.
+| Променлива / Variable | Значење / Meaning |
+|---|---|
+| `ADMIN_PASSWORD` | Лозинка на администраторите. Ако не е поставена, при првото полнење се генерира и се печати еднаш во логот на `api`. / Administrators' password; generated and logged once if unset. |
+| `DEMO_PASSWORD` | Лозинка на истражувачите, на ист начин. / Researchers' password, likewise. |
+| `DEMO_LOGINS` | `none` (стандардно), `researcher` или `all`: кои сметки страницата за најава ги нуди со лозинка. / Which accounts the login page lists, with their password. |
 
-Најавата е потребна за резервации; администрацијата бара улога `admin`.
-Sign-in is required for bookings; administration requires the `admin` role.
+Причината: администраторот ги гледа биографиите и пораките на кандидатите, па
+јавно објавена администраторска лозинка би му ги дала на секој посетител. За
+преглед на проектот препорачано е `DEMO_LOGINS=researcher`, а администраторската
+лозинка да им се даде на оценувачите посебно. / An administrator can read
+applicants' CVs and messages, so a published admin password would hand them to
+every visitor. For a review, `DEMO_LOGINS=researcher` is recommended, with the
+admin password given to the examiners separately.
+
+Без Docker (`npm start`, `npm run dev:server`) двете лозинки се `genomika2026`
+и страницата ги нуди двете сметки — за локална работа. / Run without Docker,
+both passwords are `genomika2026` and the login page lists both, for local work.
 
 ---
 
@@ -156,10 +173,11 @@ genomika-lab/
 │   └── src/
 │       ├── app.js           Склопување на апликацијата (без слушање порта)
 │       ├── index.js         Влезна точка: миграции, прво полнење, слушање
-│       ├── db.js            Шема — 18 табели и еден поглед — и миграции
+│       ├── db.js            Шема — 18 табели и еден поглед — и миграции (user_version)
 │       ├── seed.js          Двојазични демо податоци
 │       ├── lib/
 │       │   ├── auth.js      JWT, bcrypt, улоги, ограничување на обиди за најава
+│       │   ├── authors.js   Поврзување на авторите на трудовите со профилите
 │       │   ├── validate.js  Шеми за валидација на административните записи
 │       │   ├── limits.js    Ограничување на барања и должина на полиња
 │       │   └── dates.js     Календарски датуми во локалната временска зона
@@ -173,6 +191,7 @@ genomika-lab/
 └── client/                  React 18 + TypeScript + Vite + Tailwind v4
     ├── nginx.conf           Веб-слојот: статика, gzip, кеш, proxy кон api
     ├── security-headers.conf  CSP и останатите безбедносни заглавја
+    ├── trusted-proxies.sh  На стартување: од кого nginx верува на X-Forwarded-For
     ├── tests/bio.test.ts    32 теста за алгоритмите и BibTeX
     └── src/
         ├── lib/bio/         ★ Алгоритамска библиотека — без надворешни зависности
@@ -180,7 +199,7 @@ genomika-lab/
         │   ├── enzymes.ts     Рестрикциски ензими, дигестија, миграција на гел
         │   └── samples.ts     Примероци за двете алатки
         ├── lib/bibtex.ts    BibTeX извоз
-        ├── i18n/dict.ts     373 двојазични записи во една рамна табела
+        ├── i18n/dict.ts     386 двојазични записи во една рамна табела
         ├── components/      Дизајн систем, графикони, мрежен граф, приказ на секвенци
         └── pages/           18 страници
 ```
@@ -218,13 +237,13 @@ genomika-lab/
 | `GET` | `/news` · `/events` | Вести и настани |
 | `POST` | `/events/:id/rsvp` | Пријава за настан (проверка на капацитет и дупликат) |
 | `GET` | `/events/:id/ics?lang=mk\|en` | Извоз во календар (RFC 5545) |
-| `GET` | `/instruments` · `/instruments/:slug/availability?date=` | Инструменти и достапност по часови |
-| `POST` | `/bookings` 🔒 | Резервација (преклопување, работно време, траење, хоризонт од 180 дена, квота) |
+| `GET` | `/instruments` · `/instruments/:slug/availability?date=` | Инструменти и достапност по часови; за најавен корисник и дали има обука |
+| `POST` | `/bookings` 🔒 | Резервација (преклопување, работно време, траење, хоризонт од 180 дена, квота, обука) |
 | `GET` | `/bookings/mine` 🔒 · `DELETE /bookings/:id` 🔒 | Мои резервации / откажување |
 | `GET` | `/positions` | Позиции; отворена е додека не помине рокот |
 | `POST` | `/positions/:slug/apply` | Пријава за позиција со CV |
 | `POST` | `/messages` | Контакт форма |
-| `GET` | `/metrics` · `/network` · `/partners` | Агрегати за контролната табла |
+| `GET` | `/metrics` · `/network` | Агрегати, партнери и мрежа за контролната табла |
 | `*` | `/admin/*` 🔒 | CRUD и сандаче, достапно само за `admin` |
 | `GET` | `/admin/applications/:id/cv` 🔒 | Преземање на прикачена биографија |
 
@@ -232,17 +251,19 @@ genomika-lab/
 
 ## Безбедност / Security
 
-* Лозинките се чуваат со bcrypt; токените се JWT потпишани со `JWT_SECRET`, без кој серверот одбива да стартува во продукција. Улогата секогаш се чита од базата, не од токенот.
-* Неуспешните најави се ограничуваат по клиент (8 во минута); јавните форми — пријави, пораки, RSVP — по 10 на 10 минути.
-* Прикачената биографија се проверува по содржина (magic bytes), не по наведениот тип, пред да се запише на диск, и се презема само со администраторски токен.
-* Секое слободно текстуално поле има горна граница на должина; административните записи минуваат низ шема пред да се зачуваат.
-* nginx праќа Content-Security-Policy без надворешни извори (фонтовите се самостојно хостирани), `X-Frame-Options: DENY`, `nosniff` и строга `Referrer-Policy`.
+* **Лозинки и токени.** bcrypt; JWT потпишан со `JWT_SECRET`, без кој серверот одбива да стартува во продукција (во развој се користи случајна тајна за секој процес). Улогата секогаш се чита од базата, не од токенот. Непостоечка е-пошта чини исто колку и погрешна лозинка, па одговорот не открива кои сметки постојат.
+* **Кој е клиентот.** nginx верува на `X-Forwarded-For` само од проксија на сопствената Docker мрежа (таму стои ingress-от на платформата) и од нив го зема само последниот запис; на `api` му праќа една адреса, а `api` верува точно на тој еден скок. Записите што ги додал самиот клиент никогаш не се читаат — тест и smoke проверка го докажуваат тоа.
+* **Ограничувања.** Неуспешни најави: 8 во минута по клиент. Јавни форми (пријави, пораки, RSVP): 10 на 10 минути. Тело на барање: 100 KB, освен за пријава со CV.
+* **Прикачени CV.** Наставката одредува формат (PDF, DOC, DOCX); декларираниот тип мора да одговара на неа, а содржината на форматот (DOCX мора да содржи `word/document.xml`). Се чува под случајно име со проверената наставка и се враќа само како прилог, само со администраторски токен.
+* **Податоци.** Секое слободно поле има горна граница; административните записи минуваат низ шема; `%` и `_` во пребарување се бараат буквално.
+* **nginx.** Content-Security-Policy без надворешни извори (фонтовите се самостојно хостирани), `X-Frame-Options: DENY`, `nosniff`, строга `Referrer-Policy`; без `X-Powered-By` и без CORS.
 
-* Passwords are hashed with bcrypt; tokens are JWTs signed with `JWT_SECRET`, without which the server refuses to start in production. The role is always read from the database, never from the token.
-* Failed sign-ins are throttled per client (8 a minute); public forms — applications, messages, RSVPs — to 10 per 10 minutes.
-* An uploaded CV is checked by content (magic bytes), not by its declared type, before it is written, and can only be downloaded with an administrator token.
-* Every free-text field is length-capped, and administrative records pass through a schema before they are stored.
-* nginx sends a Content-Security-Policy with no third-party origins (fonts are self-hosted), `X-Frame-Options: DENY`, `nosniff` and a strict `Referrer-Policy`.
+* **Passwords and tokens.** bcrypt; JWTs signed with `JWT_SECRET`, without which the server refuses to start in production (development uses a random per-process secret). The role is always read from the database. An unknown address costs the same bcrypt comparison as a wrong password, so timing does not reveal which accounts exist.
+* **Who the client is.** nginx believes `X-Forwarded-For` only from proxies on its own Docker network — where the platform's ingress sits — and reads only the last entry; it hands the api a single address, and the api trusts exactly that one hop. Entries a client writes itself are never read; a test and a smoke check prove it.
+* **Limits.** Failed sign-ins: 8 a minute per client. Public forms: 10 per 10 minutes. Request bodies: 100 KB, except an application carrying a CV.
+* **Uploaded CVs.** The extension picks the format (PDF, DOC, DOCX); the declared type must match it, and so must the content (a DOCX must contain `word/document.xml`). Stored under a random name with the vetted extension and returned only as an attachment, only to an administrator.
+* **Data.** Every free-text field is capped; administrative records pass through a schema; `%` and `_` in a search match themselves.
+* **nginx.** A Content-Security-Policy with no third-party origins, `X-Frame-Options: DENY`, `nosniff`, a strict `Referrer-Policy`; no `X-Powered-By`, no CORS.
 
 ### Измислени идентификатори / Fictional identifiers
 
@@ -255,8 +276,9 @@ Publication and dataset DOIs use the `10.5555` prefix, which is reserved for tes
 ## Пристапност / Accessibility
 
 * Скок-врска кон главната содржина и семантички ориентири
-* Контролите се достижни со тастатура, со видлив фокус прстен; вредностите во
-  графиконите засега се читаат само со покажувач, но секој графикон носи и `aria-label`
+* Контролите се достижни со тастатура, со видлив фокус прстен
+* Мрежата на соработка има и текстуален приказ („Мрежата како список“): група, проекти и коавтори за секоја личност
+* Истечена сесија се објавува со порака наместо тивко да не успеваат дејствата
 * `aria-pressed`, `aria-expanded`, `aria-label` и `role="status"` / `role="alert"` каде што има состојба
 * Графиконите носат текстуален `aria-label`; идентитетот на серијата никогаш не зависи само од боја
 * Контрастот се мери со `npm run check:contrast` врз секоја површина, во двете теми: текст ≥ 4.5:1, граници на контроли ≥ 3.0:1, серии во графиконите ≥ 3.0:1
@@ -332,7 +354,8 @@ containers (`npm start`) — that code remains, for local work.
 
 1. Push-ни го репозиторумот и внеси ја URL-адресата и гранката на страницата на стекот.
 2. Додај ја променливата `JWT_SECRET` како environment value на стекот. **Задолжителна е** — серверот одбива да стартува во продукција без неа, а Compose нема да го подигне стекот. Генерирај ја со `openssl rand -base64 48`.
-3. Притисни **Validate**, потоа **Deploy**. Првиот build трае неколку минути (се компајлира `better-sqlite3`); двата image-а се градат паралелно.
+3. Додај `ADMIN_PASSWORD` и `DEMO_PASSWORD` (и, по избор, `DEMO_LOGINS=researcher`) — види [Демо сметки](#демо-сметки--demo-accounts).
+4. Притисни **Validate**, потоа **Deploy**. Првиот build трае неколку минути (се компајлира `better-sqlite3`); двата image-а се градат паралелно.
 
 ### Што се случува при првиот деплој / What the first deploy does
 
@@ -352,10 +375,12 @@ moment of deployment — events and bookings always look current. Set
 |---|---|---|
 | `JWT_SECRET` | **нема** / none | Потпишување на токени. Серверот одбива да стартува во продукција без неа |
 | `AUTO_SEED` | `true` | Полнење на празна база при прво подигање |
+| `ADMIN_PASSWORD` · `DEMO_PASSWORD` · `DEMO_LOGINS` | — · — · `none` | Демо сметки — види погоре / Demo accounts — see above |
 | `DB_PATH` | `/data/genomika.db` | SQLite датотека, на именуван волумен |
 | `UPLOAD_DIR` | `/data/uploads` | Прикачени биографии, на истиот волумен |
 | `PORT` | `4000` | Внатрешна порта на `api`; nginx ја проследува, `stack.yml` изложува само `web:80` |
 | `TZ` | `Europe/Skopje` | Временска зона за „денес“ — резервации, рокови, статус на проекти |
+| `TRUSTED_PROXIES` | — | (web) Дополнителни опсези на проксија чиј `X-Forwarded-For` nginx го прифаќа; проксијата на сопствената мрежа се прифаќаат автоматски |
 
 Целата променлива состојба живее на именуваниот волумен `genomika-data`.
 RepoRun никогаш не брише волумени, па резервациите, пријавите и пораките
@@ -381,9 +406,20 @@ Compose-датотеката користи `expose` наместо `ports`, б�
 за ingress. За локален пристап додај `ports: ["8080:80"]` на сервисот `web`,
 па отвори `http://localhost:8080`.
 
+На Linux објавената порта стигнува до nginx од gateway-от на самата Docker
+мрежа, кој nginx тогаш го смета за прокси — безопасно на развојна машина, но
+објавена порта не треба да биде изложена на интернет без прокси пред неа.
+(Docker Desktop на macOS и Windows се поврзува од надвор од мрежата.)
+
 The compose file uses `expose` rather than `ports`, because RepoRun handles
 ingress. For local access add `ports: ["8080:80"]` to the `web` service and
 open `http://localhost:8080`.
+
+On a Linux host a published port reaches nginx from the Docker network's own
+gateway, which nginx then treats as a proxy; that is harmless on a development
+machine but means a published port should not face the internet without a
+proxy in front of it. (Docker Desktop on macOS and Windows connects from
+outside the network, so it is not affected.)
 
 ---
 

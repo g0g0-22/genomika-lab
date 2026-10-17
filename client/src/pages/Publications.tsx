@@ -3,7 +3,8 @@ import { useLang } from '../i18n';
 import { useFetch } from '../lib/useFetch';
 import { PageHeader, Card, Label, Loading, ErrorBox, Empty, Toggle, download, CopyButton, accentVar } from '../components/ui';
 import { BarChart } from '../components/charts';
-import { toBibtex } from '../lib/bibtex';
+import { toBibtex, toBibtexFile, citationKey } from '../lib/bibtex';
+import { fetchAllPages } from '../lib/api';
 
 type Pub = {
   id: number; title: string; authors: string; venue: string; year: number;
@@ -15,7 +16,7 @@ type Page = { items: Pub[]; total: number; page: number; pages: number; limit: n
 type Facets = { years: { year: number; n: number }[]; types: { type: string; n: number }[] };
 
 export default function Publications() {
-  const { t, f, formatNumber } = useLang();
+  const { t, f, formatNumber, tv } = useLang();
   const [query, setQuery] = useState('');
   const [year, setYear] = useState('');
   const [group, setGroup] = useState('');
@@ -46,9 +47,17 @@ export default function Publications() {
     [facets.data]
   );
 
+  // Every matching record, not the first page of them.
+  const [exportFailed, setExportFailed] = useState(false);
   const exportAll = async () => {
-    const all = await fetch(`/api/publications?${new URLSearchParams({ ...Object.fromEntries(params), limit: '50', page: '1' })}`).then(r => r.json());
-    download('genomika-lab.bib', all.items.map(toBibtex).join('\n\n'), 'application/x-bibtex');
+    setExportFailed(false);
+    try {
+      const { limit: _limit, page: _page, ...filters } = Object.fromEntries(params);
+      const all = await fetchAllPages<Pub>('/publications', filters);
+      download('genomika-lab.bib', toBibtexFile(all), 'application/x-bibtex');
+    } catch {
+      setExportFailed(true);
+    }
   };
 
   return (
@@ -103,7 +112,7 @@ export default function Publications() {
               {facets.data?.types.map(x => (
                 <button key={x.type} type="button" aria-pressed={type === x.type} className={`chip ${type === x.type ? 'chip-on' : ''}`}
                         onClick={() => reset(() => setType(x.type))}>
-                  {t(`pub.type.${x.type}` as any)}
+                  {tv('pub.type', x.type)}
                 </button>
               ))}
             </div>
@@ -115,7 +124,8 @@ export default function Publications() {
             <span className="text-[12.5px] text-ink2">{t('pub.openaccess')}</span>
           </label>
 
-          <button className="btn btn-sm w-full justify-center" onClick={exportAll}>{t('pub.exportall')}</button>
+          <button type="button" className="btn btn-sm w-full justify-center" onClick={exportAll}>{t('pub.exportall')}</button>
+          {exportFailed && <p className="mt-2 text-[12px] text-danger" role="alert">{t('common.error')}</p>}
 
           {perYear.length > 0 && (
             <Card className="p-4">
@@ -159,7 +169,7 @@ export default function Publications() {
                 <Card hover className="p-5">
                   <div className="flex flex-wrap items-center gap-2 mb-2.5">
                     <span className="num text-accent text-sm">{pub.year}</span>
-                    <span className="chip">{t(`pub.type.${pub.type}` as any)}</span>
+                    <span className="chip">{tv('pub.type', pub.type)}</span>
                     {pub.group_slug && (
                       <span className="chip" style={{ borderColor: accentVar(pub.accent), color: accentVar(pub.accent) }}>
                         {f(pub, 'group_name')}
@@ -191,7 +201,7 @@ export default function Publications() {
                       <pre className="seq card p-3.5 scroll-thin overflow-auto text-[11.5px] whitespace-pre">{toBibtex(pub)}</pre>
                       <div className="flex gap-2 mt-2">
                         <CopyButton text={toBibtex(pub)} />
-                        <button className="btn btn-sm" onClick={() => download(`${pub.id}.bib`, toBibtex(pub), 'application/x-bibtex')}>
+                        <button type="button" className="btn btn-sm" onClick={() => download(`${citationKey(pub)}.bib`, toBibtex(pub), 'application/x-bibtex')}>
                           .bib
                         </button>
                       </div>

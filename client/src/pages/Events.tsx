@@ -59,7 +59,7 @@ function Rsvp({ event, onDone }: { event: Event; onDone: () => void }) {
 }
 
 export default function Events() {
-  const { t, f, s, lang, formatDate } = useLang();
+  const { t, f, s, lang, formatDate, tv } = useLang();
   const [scope, setScope] = useState('upcoming');
   const [open, setOpen] = useState<number | null>(null);
   const events = useFetch<Event[]>(`/events?scope=${scope}`, [scope]);
@@ -95,7 +95,7 @@ export default function Events() {
                 </div>
 
                 <div className="min-w-0">
-                  <span className="chip">{t(`ev.kind.${event.kind}` as any)}</span>
+                  <span className="chip">{tv('ev.kind', event.kind)}</span>
                   <h2 className="mt-2.5 text-xl leading-snug">{f(event, 'title')}</h2>
                   {event.speaker && (
                     <p className="mt-2 text-[13px] text-ink2">

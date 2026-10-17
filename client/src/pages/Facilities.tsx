@@ -5,11 +5,13 @@ import { useFetch } from '../lib/useFetch';
 import { post, del, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { localIsoDate } from '../lib/dates';
-import { PageHeader, Card, Label, Loading, ErrorBox, Empty, Notice, Field } from '../components/ui';
+import { PageHeader, Card, Label, Loading, ErrorBox, Notice, Field } from '../components/ui';
 
 type Instrument = {
   id: number; slug: string; category: string; location: string;
   hourly_rate: number; requires_training: number;
+  /** Present when signed in: whether this user may book it themselves. */
+  trained?: boolean;
   open_from: number; open_to: number; max_hours: number; status: string;
   name_mk: string; name_en: string; description_mk: string; description_en: string;
 };
@@ -25,10 +27,10 @@ const todayIso = () => localIsoDate();
 const pad = (h: number) => `${String(h).padStart(2, '0')}:00`;
 
 export default function Facilities() {
-  const { t, f, s, formatDate, formatNumber } = useLang();
+  const { t, f, s, formatDate, formatNumber, tv } = useLang();
   const { user } = useAuth();
 
-  const instruments = useFetch<Instrument[]>('/instruments');
+  const instruments = useFetch<Instrument[]>('/instruments', [user?.id]);
   const [slug, setSlug] = useState<string | null>(null);
   const [date, setDate] = useState(todayIso());
   const [hours, setHours] = useState<number[]>([]);
@@ -40,7 +42,7 @@ export default function Facilities() {
     if (!slug && instruments.data?.length) setSlug(instruments.data[0].slug);
   }, [instruments.data, slug]);
 
-  const availability = useFetch<Availability>(slug ? `/instruments/${slug}/availability?date=${date}` : null, [slug, date]);
+  const availability = useFetch<Availability>(slug ? `/instruments/${slug}/availability?date=${date}` : null, [slug, date, user?.id]);
   const mine = useFetch<Booking[]>(user ? '/bookings/mine' : null, [user?.id]);
 
   useEffect(() => { setHours([]); setMessage(null); }, [slug, date]);
@@ -84,8 +86,8 @@ export default function Facilities() {
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'error';
       const known = ['slot_taken', 'exceeds_max_hours', 'outside_opening_hours', 'date_in_past', 'instrument_unavailable',
-                     'too_far_ahead', 'quota_exceeded'];
-      setMessage({ kind: 'error', text: known.includes(code) ? t(`fac.err.${code}` as any) : t('common.error') });
+                     'too_far_ahead', 'quota_exceeded', 'training_required', 'purpose_too_long'];
+      setMessage({ kind: 'error', text: known.includes(code) ? tv('fac.err', code) : t('common.error') });
     } finally {
       setSaving(false);
     }
@@ -134,7 +136,7 @@ export default function Facilities() {
         <aside className="space-y-7 lg:sticky lg:top-28">
           {byCategory.map(([category, list]) => (
             <div key={category}>
-              <h2 className="label mb-3">{t(`fac.category.${category}` as any)}</h2>
+              <h2 className="label mb-3">{tv('fac.category', category)}</h2>
               <ul className="space-y-2">
                 {list.map(item => (
                   <li key={item.id}>
@@ -241,7 +243,7 @@ export default function Facilities() {
                         }`}
                       >
                         <span className="num text-[12px] block">{pad(slot.hour)}</span>
-                        <span className="label block mt-1 !text-[8.5px]" style={selected ? { color: 'var(--paper)' } : undefined}>
+                        <span className="label block mt-1 !text-[10px]" style={selected ? { color: 'var(--paper)' } : undefined}>
                           {state}
                         </span>
                       </button>
@@ -255,6 +257,8 @@ export default function Facilities() {
                     <Notice>
                       {t('fac.signin')} <Link to="/login" className="text-accent link-underline ml-1">{t('nav.login')} →</Link>
                     </Notice>
+                  ) : instrument.trained === false ? (
+                    <Notice>{t('fac.untrained')}</Notice>
                   ) : !range ? (
                     <p className="text-[13px] text-muted">{t('fac.selectslot')}</p>
                   ) : (
@@ -265,7 +269,7 @@ export default function Facilities() {
                           value={purpose}
                           onChange={e => setPurpose(e.target.value)}
                           placeholder={t('fac.purposeph')}
-                          maxLength={300}
+                          maxLength={200}
                         />
                       </Field>
                       <div className="flex items-end gap-4">

@@ -104,7 +104,7 @@ export const dict = {
 
   /* -------------------------------------------------------- RESEARCH -- */
   'research.title':    ['Истражување', 'Research'],
-  'research.lead':     ['Три групи, шест активни проекти и една заедничка методолошка заложба: секој заклучок мора да може да се изведе повторно.', 'Three groups, six live projects and one shared methodological commitment: every conclusion must be reproducibly derived.'],
+  'research.lead':     ['Три истражувачки групи и една заедничка методолошка заложба: секој заклучок мора да може да се изведе повторно.', 'Three research groups and one shared methodological commitment: every conclusion must be reproducibly derived.'],
   'research.projects': ['Проекти', 'Projects'],
   'research.members':  ['Членови', 'Members'],
   'research.funder':   ['Финансиер', 'Funder'],
@@ -117,7 +117,7 @@ export const dict = {
 
   /* ------------------------------------------------------------ TEAM -- */
   'team.title':        ['Тим', 'Team'],
-  'team.lead':         ['Десет луѓе од информатика, биологија и математика.', 'Ten people from computer science, biology and mathematics.'],
+  'team.lead':         ['Истражувачи од информатиката, биологијата и математиката.', 'Researchers from computer science, biology and mathematics.'],
   'team.seniority.faculty':    ['Наставен кадар', 'Faculty'],
   'team.seniority.postdoc':    ['Постдокторски истражувачи', 'Postdocs'],
   'team.seniority.staff':      ['Стручен кадар', 'Staff'],
@@ -188,7 +188,8 @@ export const dict = {
   'seq.orf.start':     ['Почеток', 'Start'],
   'seq.orf.end':       ['Крај', 'End'],
   'seq.orf.aa':        ['АК', 'aa'],
-  'seq.invalid':       ['Непознатите знаци беа игнорирани', 'Unknown characters were ignored'],
+  'seq.invalid':       ['Изоставени знаци што не се ознаки за нуклеотиди: {n}.', 'Characters left out because they are not nucleotide codes: {n}.'],
+  'seq.ambiguous':     ['Двосмислени бази (R, Y, K …) прочитани како N: {n}.', 'Ambiguous bases (R, Y, K …) read as N: {n}.'],
   'seq.truncated':     ['Прикажан е само почетниот дел од секвенцата', 'Only the opening stretch of the sequence is shown'],
   'seq.multirecord':   ['Влезот содржи {n} записи — се анализира само првиот, {id}.', 'The input holds {n} records — only the first, {id}, is analysed.'],
   'seq.isprotein':     ['Ова изгледа како протеинска секвенца. Алатката анализира нуклеотидни секвенци.', 'This looks like a protein sequence. This tool analyses nucleotide sequences.'],
@@ -208,6 +209,7 @@ export const dict = {
   'gel.agarose':       ['Агароза', 'Agarose'],
   'gel.hint':          ['Изберете барем еден ензим.', 'Select at least one enzyme.'],
   'gel.topology':      ['Топологија', 'Topology'],
+  'gel.blunt':         ['тапи краеви', 'blunt'],
   'gel.linear':        ['линеарна', 'linear'],
   'gel.circular':      ['кружна', 'circular'],
   'gel.wraps':         ['Фрагментот поминува преку почетокот на кружната секвенца', 'This fragment runs past the origin of the circular sequence'],
@@ -228,6 +230,9 @@ export const dict = {
   'fac.hours':         ['Работно време', 'Opening hours'],
   'fac.maxhours':      ['Максимално времетраење на резервацијата', 'Maximum per booking'],
   'fac.training':      ['Потребна обука', 'Training required'],
+  'fac.untrained':     ['Немате обука за овој инструмент, па не можете сами да го резервирате. Обуката ја води техничкиот персонал на лабораторијата.', 'You are not trained on this instrument, so you cannot book it yourself. Training is run by the laboratory\'s technical staff.'],
+  'fac.err.training_required': ['Потребна е обука за овој инструмент.', 'Training on this instrument is required.'],
+  'fac.err.purpose_too_long':  ['Намената е предолга.', 'The purpose is too long.'],
   'fac.available':     ['Достапна', 'Available'],
   'fac.maintenance':   ['На одржување', 'Under maintenance'],
   'fac.selectslot':    ['Изберете слободни термини во распоредот.', 'Select free hours in the schedule.'],
@@ -328,6 +333,9 @@ export const dict = {
   'met.oa':            ['Отворен пристап', 'Open access'],
   'met.closed':        ['Затворен пристап', 'Closed access'],
   'met.network':       ['Мрежа на соработка', 'Collaboration network'],
+  'met.networklist':   ['Мрежата како список', 'The network as a list'],
+  'met.projects':      ['Проекти', 'Projects'],
+  'met.coauthors':     ['Коавтори (заеднички трудови)', 'Co-authors (joint papers)'],
   'met.networksub':    ['Луѓе, проекти и групи. Влечете јазол за да ја преуредите мрежата.', 'People, projects and groups. Drag a node to rearrange the network.'],
   'met.map':           ['Партнерски институции', 'Partner institutions'],
   'met.jointpapers':   ['заеднички трудови', 'joint papers'],
@@ -347,6 +355,7 @@ export const dict = {
 
   /* ----------------------------------------------------------- AUTH  -- */
   'auth.title':        ['Најава', 'Sign in'],
+  'auth.expired':      ['Сесијата истече. Најавете се повторно за да продолжите.', 'Your session has expired. Sign in again to continue.'],
   'auth.lead':         ['За резервации и управување со содржината е потребна најава.', 'Sign-in is required for bookings and for content administration.'],
   'auth.password':     ['Лозинка', 'Password'],
   'auth.submit':       ['Најави се', 'Sign in'],
@@ -355,6 +364,7 @@ export const dict = {
   'auth.demoresearch': ['Истражувач', 'Researcher'],
   'auth.demofill':     ['Пополни', 'Fill in'],
   'auth.invalid':      ['Погрешна е-пошта или лозинка.', 'Incorrect email or password.'],
+  'auth.throttled':    ['Премногу неуспешни обиди од овој уред. Почекајте една минута, па обидете се повторно.', 'Too many failed attempts from this device. Wait a minute, then try again.'],
   'auth.signedas':     ['Најавени сте како', 'Signed in as'],
 
   /* ----------------------------------------------------------- ADMIN -- */
@@ -367,6 +377,8 @@ export const dict = {
   'adm.tab.inbox':     ['Пораки', 'Inbox'],
   'adm.new':           ['Нов запис', 'New record'],
   'adm.saved':         ['Зачувано', 'Saved'],
+  'adm.keywords':      ['Клучни зборови', 'Keywords'],
+  'adm.keywordshint':  ['Одделени со точка-запирка', 'Separated by semicolons'],
   'adm.err.slug_taken':['Запис со ист наслов веќе постои.', 'A record with the same title already exists.'],
   'adm.confirmdelete': ['Дали сте сигурни? Записот ќе биде трајно избришан.', 'Are you sure? The record is deleted permanently.'],
   'adm.count.publications':    ['Публикации', 'Publications'],
@@ -379,6 +391,7 @@ export const dict = {
   'adm.count.rsvps':           ['Пријави за настани', 'Registrations'],
   'adm.applications':  ['Пријави за позиции', 'Position applications'],
   'adm.messages':      ['Контакт-пораки', 'Contact messages'],
+  'adm.latest':        ['најновите {n} од вкупно {total}', 'latest {n} of {total}'],
   'adm.bookings':      ['Претстојни резервации', 'Upcoming bookings'],
   'adm.rsvps':         ['Пријави за настани', 'Event registrations'],
   'adm.unread':        ['Непрочитани', 'Unread'],

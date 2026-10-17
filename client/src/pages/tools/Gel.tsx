@@ -5,7 +5,7 @@ import { SequenceInput } from '../../components/SequenceInput';
 import { useDebounced } from '../../lib/useDebounced';
 import { Toggle, Notice, download } from '../../components/ui';
 import {
-  ENZYMES, findCutSites, digest, recognitionSequence, migration,
+  ENZYMES, findCutSites, digest, recognitionSequence, migration, overhang,
   LADDER_1KB, LADDER_100BP, GEL_RANGES, type Enzyme
 } from '../../lib/bio/enzymes';
 import { cleanSequence, parseFasta, classifyInput, IUPAC_DNA_ALPHABET } from '../../lib/bio/sequence';
@@ -15,7 +15,7 @@ const GEL_HEIGHT = 380;
 const LANE_WIDTH = 74;
 
 export default function Gel() {
-  const { t, formatNumber } = useLang();
+  const { t, formatNumber, tv } = useLang();
   const [raw, setRaw] = useState('');
   // Derived views are recomputed from this, not from every keystroke.
   const input = useDebounced(raw);
@@ -28,8 +28,9 @@ export default function Gel() {
   // across the boundary between two unrelated sequences.
   const parsed = useMemo(() => parseFasta(input), [input]);
   const isProtein = parsed[0] ? classifyInput(parsed[0].seq) === 'protein' : false;
-  const seq = useMemo(
-    () => (isProtein ? '' : cleanSequence(parsed[0]?.seq ?? '', IUPAC_DNA_ALPHABET).seq),
+  // Degenerate codes are kept as they are: a restriction site can match them.
+  const { seq, dropped } = useMemo(
+    () => (isProtein ? { seq: '', dropped: 0 } : cleanSequence(parsed[0]?.seq ?? '', IUPAC_DNA_ALPHABET)),
     [parsed, isProtein]
   );
 
@@ -126,7 +127,8 @@ export default function Gel() {
                 {enzymes.map(enzyme => (
                   <li key={enzyme.name} className="flex items-baseline justify-between gap-3 text-[12px]">
                     <span className="num text-accent">{enzyme.name}</span>
-                    <span className="num text-muted tracking-wider">{enzyme.site}</span>
+                    <span className="num text-muted tracking-wider ml-auto">{enzyme.site}</span>
+                    <span className="label w-14 text-right">{overhang(enzyme) === 'blunt' ? t('gel.blunt') : overhang(enzyme)}</span>
                   </li>
                 ))}
               </ul>
@@ -192,6 +194,7 @@ export default function Gel() {
               records={parsed.length}
               firstId={parsed[0]?.id}
               protein={isProtein}
+              dropped={dropped}
               rows={5}
             />
           </Panel>
@@ -235,7 +238,7 @@ export default function Gel() {
                             {site.enzyme}
                           </span>
                           <span
-                            className="absolute num text-[9px] text-muted whitespace-nowrap"
+                            className="absolute num text-[10.5px] text-muted whitespace-nowrap"
                             style={{ top: barTop + 10, left: 4 }}
                           >
                             {site.position}
@@ -287,7 +290,7 @@ export default function Gel() {
                             animationDelay: `${i * 45}ms`
                           }}
                         />
-                        <span className="num absolute -left-2 -translate-x-full text-[9px] text-white/40 whitespace-nowrap" style={{ top: -5 }}>
+                        <span className="num absolute -left-2 -translate-x-full text-[10.5px] text-white/75 whitespace-nowrap" style={{ top: -5 }}>
                           {size >= 1000 ? `${size / 1000}k` : size}
                         </span>
                       </div>
@@ -312,7 +315,7 @@ export default function Gel() {
                           }}
                           title={`${fragment.length} bp`}
                         >
-                          <span className="num absolute left-full ml-2 text-[9px] text-white/70 whitespace-nowrap" style={{ top: -4 }}>
+                          <span className="num absolute left-full ml-2 text-[10.5px] text-white/85 whitespace-nowrap" style={{ top: -4 }}>
                             {formatNumber(fragment.length)}
                           </span>
                         </div>
@@ -329,7 +332,7 @@ export default function Gel() {
 
                   <div className="flex justify-between gap-4 mt-3">
                     <span className="label">{t('gel.ladder')}</span>
-                    <span className="label">{agarose}% {t('gel.agarose')} · {t(`gel.${topology}` as any)}</span>
+                    <span className="label">{agarose}% {t('gel.agarose')} · {tv('gel', topology)}</span>
                   </div>
 
                   {(ranOff.length > 0 || stuck.length > 0) && (

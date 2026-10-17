@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { db } from '../db.js';
@@ -11,8 +12,10 @@ if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
   console.error('FATAL: JWT_SECRET is not set. Refusing to start with an unsigned-equivalent secret.');
   process.exit(1);
 }
-export const JWT_SECRET = process.env.JWT_SECRET
-  || 'local-development-only-do-not-deploy';
+// In development a missing secret becomes a random one for this process only:
+// tokens stop working on restart, which is harmless, and nothing guessable ships.
+export const JWT_SECRET = process.env.JWT_SECRET || randomBytes(32).toString('hex');
+if (!process.env.JWT_SECRET) console.warn('JWT_SECRET not set: using a random per-process secret (development only).');
 const TOKEN_TTL = '8h';
 
 /*
@@ -55,11 +58,18 @@ export function recordFailure(key) {
 
 export const clearAttempts = (key) => attempts.delete(key);
 
+/*
+ * An unknown address still costs one bcrypt comparison, against a hash of the
+ * same cost as the real ones. Returning early made a wrong address answer
+ * measurably faster than a wrong password, which told a caller which
+ * addresses have accounts.
+ */
+const DECOY_HASH = bcrypt.hashSync(randomBytes(16).toString('hex'), 10);
+
 export function authenticate(email, password) {
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(String(email || '').toLowerCase().trim());
-  if (!user) return null;
-  if (!bcrypt.compareSync(String(password || ''), user.password_hash)) return null;
-  return user;
+  const matches = bcrypt.compareSync(String(password || ''), user?.password_hash ?? DECOY_HASH);
+  return user && matches ? user : null;
 }
 
 export function issueToken(user) {
