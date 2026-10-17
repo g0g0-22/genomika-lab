@@ -394,7 +394,7 @@ is gitignored. The data survives a redeploy or restart — checked with
 `docker compose down` and `up` again. RepoRun's **Delete runtime data** removes it.
 
 RepoRun ги бара и следниве правила, кои `docker-compose.yml` ги следи: секој
-сервис има `cpus` и `mem_limit` (web 0.25 / 64 MB, api 0.5 / 256 MB) и нема
+сервис има `cpus` и `mem_limit` (web 0.1 / 64 MB, api 0.4 / 256 MB — вкупно во рамките на квотата од 0.5 CPU) и нема
 `restart`. Бидејќи Docker ја создава `./data` како root, `api` стартува како root
 само колку да ѝ ја предаде на корисникот `node`, па продолжува како тој
 (`server/docker-entrypoint.sh`). / RepoRun also requires, and the compose file

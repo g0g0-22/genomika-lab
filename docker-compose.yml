@@ -16,7 +16,7 @@ services:
     build:
       context: ./client
       dockerfile: Dockerfile
-    cpus: 0.25
+    cpus: 0.1
     mem_limit: 64m
     depends_on:
       api:
@@ -32,7 +32,7 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
-    cpus: 0.5
+    cpus: 0.4
     mem_limit: 256m
     environment:
       NODE_ENV: production
