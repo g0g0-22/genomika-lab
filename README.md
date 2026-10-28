@@ -27,6 +27,7 @@ The project is deliberately not a plain landing page. It is built as what real b
 | 📊 | Репозиториум на податоци со преглед и преземање CSV | Dataset repository with preview and CSV download |
 | 📈 | Контролна табла со метрики, Gantt и мрежа на соработка | Metrics dashboard with a Gantt chart and collaboration network |
 | ✉️ | Пријави за настани (+ `.ics`), за позиции (+ прикачување CV) и контакт форма | Event RSVPs (+ `.ics`), job applications (+ CV upload) and a contact form |
+| 🍪 | Известување за колачиња со вистински избор (само неопходни / и поставки) и страница што го наведува секое колаче | Cookie notice with a real choice (necessary only / also preferences) and a page listing every cookie |
 | 🌍 | Двојазичен интерфејс и содржина МК/EN (публикациите се на јазикот на кој се објавени) и светла/темна тема | Bilingual MK/EN interface and content (publications in the language they were published in) and light/dark themes |
 
 ---

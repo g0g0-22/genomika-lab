@@ -1,5 +1,6 @@
 import { createContext, useContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { dict, type DictKey } from './dict';
+import { recallPreference, rememberPreference } from '../lib/cookies';
 
 export type Lang = 'mk' | 'en';
 
@@ -44,12 +45,11 @@ function formatMkWithoutLocaleData(d: Date, opts: Intl.DateTimeFormatOptions) {
 }
 
 const LangContext = createContext<Ctx | null>(null);
-const STORAGE_KEY = 'genomika.lang';
+const STORAGE_KEY = 'genomika_lang';
 
 function initialLang(): Lang {
   if (typeof window === 'undefined') return 'mk';
-  let stored: string | null = null;
-  try { stored = window.localStorage.getItem(STORAGE_KEY); } catch { /* storage blocked */ }
+  const stored = recallPreference(STORAGE_KEY);
   if (stored === 'mk' || stored === 'en') return stored;
   return navigator.language?.toLowerCase().startsWith('mk') ? 'mk' : 'en';
 }
@@ -59,7 +59,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = lang;
-    try { window.localStorage.setItem(STORAGE_KEY, lang); } catch { /* private mode */ }
+    rememberPreference(STORAGE_KEY, lang);
   }, [lang]);
 
   const setLang = useCallback((l: Lang) => setLangState(l), []);

@@ -90,7 +90,7 @@ head('Web tier (nginx)');
   for (const route of ['/research', '/research/comparative-genomics', '/team', '/team/ana-trajkovska',
                        '/publications', '/datasets', '/tools', '/tools/toolkit', '/tools/gel',
                        '/facilities', '/events', '/news', '/careers', '/contact', '/metrics',
-                       '/login', '/admin', '/no-such-page']) {
+                       '/login', '/admin', '/cookies', '/no-such-page']) {
     const r = await req(`${BASE}${route}`, { raw: true });
     check(`client route ${route}`, r.status === 200);
   }

@@ -15,6 +15,7 @@ import Facilities from './pages/Facilities';
 import Careers from './pages/Careers';
 import Contact from './pages/Contact';
 import Metrics from './pages/Metrics';
+import Cookies from './pages/Cookies';
 import Login from './pages/Login';
 import Admin from './pages/admin/Admin';
 
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="careers" element={<Careers />} />
         <Route path="contact" element={<Contact />} />
         <Route path="metrics" element={<Metrics />} />
+        <Route path="cookies" element={<Cookies />} />
         <Route path="login" element={<Login />} />
         <Route path="admin" element={<Admin />} />
 

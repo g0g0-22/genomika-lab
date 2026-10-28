@@ -1,22 +1,21 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { recallPreference, rememberPreference } from './cookies';
 
 type Theme = 'light' | 'dark';
 const ThemeContext = createContext<{ theme: Theme; toggle: () => void } | null>(null);
-const KEY = 'genomika.theme';
+const KEY = 'genomika_theme';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    try {
-      const stored = localStorage.getItem(KEY);
-      if (stored === 'light' || stored === 'dark') return stored;
-    } catch { /* private mode */ }
+    const stored = recallPreference(KEY);
+    if (stored === 'light' || stored === 'dark') return stored;
     return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   });
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
     document.documentElement.style.colorScheme = theme;
-    try { localStorage.setItem(KEY, theme); } catch { /* private mode */ }
+    rememberPreference(KEY, theme);
   }, [theme]);
 
   return (

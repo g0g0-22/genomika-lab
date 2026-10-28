@@ -3,6 +3,8 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useLang } from '../i18n';
 import { useTheme } from '../lib/theme';
 import { useAuth } from '../lib/auth';
+import { OPEN_COOKIE_SETTINGS } from '../lib/cookies';
+import { CookieBanner } from './CookieBanner';
 
 /* ------------------------------------------------------------ BRAND MARK */
 
@@ -278,7 +280,13 @@ function Footer() {
 
         <div className="mt-20 pt-6 border-t border-line flex flex-wrap items-center justify-between gap-5">
           <span className="label">© {new Date().getFullYear()} {t('brand.name')} — {t('foot.rights')}</span>
-          <span className="label">{t('brand.city')}</span>
+          <span className="flex flex-wrap items-center gap-5">
+            <Link to="/cookies" className="label hover:text-ink">{t('cookie.title')}</Link>
+            <button type="button" className="label hover:text-ink" onClick={() => window.dispatchEvent(new Event(OPEN_COOKIE_SETTINGS))}>
+              {t('cookie.settings')}
+            </button>
+            <span className="label">{t('brand.city')}</span>
+          </span>
         </div>
       </div>
     </footer>
@@ -317,6 +325,7 @@ export default function Layout() {
         <Outlet />
       </main>
       <Footer />
+      <CookieBanner />
     </div>
   );
 }
